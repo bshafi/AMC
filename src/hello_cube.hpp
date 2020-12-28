@@ -2,6 +2,11 @@
 
 #include <glm/glm.hpp>
 
+#include <vector>
+#include <map>
+
+union SDL_Event;
+
 class HelloCube {
 public:
     HelloCube();
@@ -11,7 +16,7 @@ public:
     HelloCube& operator=(HelloCube &&);
 
     void draw();
-    void update();
+    void update(const std::vector<SDL_Event>&);
 private:
     void destroy();
     unsigned int VBO, EBO, VAO;
@@ -19,4 +24,8 @@ private:
 
     unsigned int shader_program;
     float rotation_around_y_axis;
+    std::map<char, bool> keypressed;
+
+    int camera_pos_loc, camera_rot_loc, object_pos_loc, object_rot_loc, aspect_ratio_loc;
+    glm::vec3 objpos;
 };
