@@ -5,6 +5,8 @@
 #include <SDL_ttf/SDL_ttf.h>
 
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 
 #include <array>
 
@@ -47,7 +49,7 @@ std::array<uint32_t, 19> cube_edges_lines = {
     0, 1, 3, 2, 0, 6, 4, 5, 7, 6, 0, 1, 7, 1, 3, 5, 3, 2, 4
 };
 
-HelloCube::HelloCube() : rotation_around_y_axis{0.0f} {
+HelloCube::HelloCube() : rotation_around_y_axis{ 0.0f } {
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
@@ -73,6 +75,21 @@ HelloCube::HelloCube() : rotation_around_y_axis{0.0f} {
     glBindVertexArray(0);
 
     shader_program = LoadShaderProgram("shaders/hello_cube.vert", "shaders/hello_cube.frag");
+    camera_pos_loc = glGetUniformLocation(shader_program, "camera_pos");
+    assert(camera_pos_loc != -1);
+    glUniform3f(camera_pos_loc, 0.0f, 0.0f, -4.0f);
+    camera_rot_loc = glGetUniformLocation(shader_program, "camera_rot");
+    assert(camera_rot_loc != -1);
+    glUniform3f(camera_rot_loc, 0.0f, 0.0f, 0.0f);
+    object_pos_loc = glGetUniformLocation(shader_program, "object_pos");
+    assert(object_pos_loc != -1);
+    glUniform3f(object_pos_loc, 0.0f, 0.0f, 0.0f);
+    object_rot_loc = glGetUniformLocation(shader_program, "object_rot");
+    assert(object_rot_loc != -1);
+    glUniform3f(object_rot_loc, 0.0f, 0.0f, 0.0f);
+    aspect_ratio_loc = glGetUniformLocation(shader_program, "aspect_ratio");
+    assert(aspect_ratio_loc != -1);
+    glUniform1f(aspect_ratio_loc, 640.0f / 480.0f);
 }
 HelloCube::~HelloCube() {
     this->destroy();
@@ -103,14 +120,18 @@ HelloCube& HelloCube::operator=(HelloCube &&other) {
 }
 
 void HelloCube::draw() {
-    auto rot_loc = glGetUniformLocation(shader_program, "rotation_around_y_axis");
-    assert(rot_loc != -1);
-    glUniform1f(rot_loc, rotation_around_y_axis);
+    //auto object_rot_loc = glGetUniformLocation(shader_program, "object_rot");
+    //assert(object_rot_loc != -1);
+    glUniform3f(object_rot_loc, 0.0f, rotation_around_y_axis, 0.0f);
+    glUniform3f(camera_pos_loc, objpos.x, objpos.y, objpos.z);
 
-    auto loc = glGetUniformLocation(shader_program, "outColor");
-    assert(loc != -1);
+    auto outColor_loc = glGetUniformLocation(shader_program, "outColor");
+    assert(outColor_loc != -1);
 
-    glUniform3f(loc, 1.0f, 1.0f, 1.0f);
+
+    glUniform1f(aspect_ratio_loc, 640.0f / 480.0f);
+
+    glUniform3f(outColor_loc, 1.0f, 1.0f, 1.0f);
     glUseProgram(shader_program);
     glBindVertexArray(VAO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
@@ -118,11 +139,45 @@ void HelloCube::draw() {
     glDrawElements(GL_TRIANGLES, cube_indices.size(), GL_UNSIGNED_INT, 0);
 
 
-    glUniform3f(loc, 1.0f, 0.0f, 0.0f);
+    glUniform3f(outColor_loc, 1.0f, 0.0f, 0.0f);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO_edges);
     glDrawElements(GL_LINE_STRIP, cube_edges_lines.size(), GL_UNSIGNED_INT, 0);
     glBindVertexArray(0);
 }
-void HelloCube::update() {
+void HelloCube::update(const std::vector<SDL_Event> &events) {
     rotation_around_y_axis += 0.01f;
+    
+    if (keypressed['w']) {
+        objpos.z += 0.01f;
+    }
+    if (keypressed['s']) {
+        objpos.z -= 0.01f;
+    }
+    if (keypressed['a']) {
+        objpos.x += 0.01f;
+    }
+    if (keypressed['d']) {
+        objpos.x -= 0.01f;
+    }
+
+    for (const auto &event : events) {
+        if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+            const bool keystate = event.type == SDL_KEYDOWN;
+            switch (event.key.keysym.scancode) {
+            case SDL_SCANCODE_W:
+                keypressed['w'] = keystate;
+                break;
+            case SDL_SCANCODE_A:
+                keypressed['a'] = keystate;
+                break;
+            case SDL_SCANCODE_S:
+                keypressed['s'] = keystate;
+                break;
+            case SDL_SCANCODE_D:
+                keypressed['d'] = keystate;
+                break;
+            default: break;
+            }
+        }
+    }
 }
