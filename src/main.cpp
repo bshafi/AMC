@@ -32,37 +32,55 @@ int main(const int, const char**) {
     SDL_GLContext sdl_glcontext = SDL_GL_CreateContext(window);
     assert(sdl_glcontext);
 
-    auto glewError = glewInit();
-    if (glewError != GLEW_OK) {
-        printf("%s\n", glewGetErrorString(glewError));
+    {
+        GLenum glewError = glewInit();
+        if (glewError != GLEW_OK) {
+            printf("%s\n", glewGetErrorString(glewError));
+        }
     }
 
+    glEnable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
     int width, height;
     SDL_GL_GetDrawableSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
-    
-    //unsigned int shader_program = LoadShaderProgram("shaders/hello_cube.vert", "shaders/hello_cube.frag");
-
     HelloCube hc;
 
     uint32_t ticks = SDL_GetTicks();
     float delta_time_s = 0.0f;
 
+    glm::vec3 camera_position = { 0.0f, 0.0f, 0.0f };
+    // 3 
+    glm::mat3x3 camera_orientation = {
+        glm::vec3(1.0f, 0.0f, 0.0f),
+        glm::vec3(0.0f, 1.0f, 0.0f),
+        glm::vec3(0.0f, 0.0f, 1.0f)
+    };
+
     bool is_running = true;
+    std::vector<SDL_Event> events;
     while (is_running) {
+
+        events.clear();
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
             switch (event.type) {
-            case SDL_QUIT:
-                is_running = false;
+            case SDL_QUIT: is_running = false; break;
+            case SDL_WINDOWEVENT: {
+                switch (event.window.type) {
+                case SDL_WINDOWEVENT_RESIZED:
+                    glViewport(0, 0, event.window.data1, event.window.data2);
+                    break;
+                }
+            }
                 break;
+            default: events.push_back(event); break;
             }
         }
-        hc.update();
+        hc.update(events);
 
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         hc.draw();
 
