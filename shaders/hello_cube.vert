@@ -1,6 +1,7 @@
 #version 330
 
-layout (location = 0) in vec4 pos;
+layout (location = 0) in vec3 pos;
+layout (location = 1) in vec2 atexCoords;
 
 // width / height
 uniform float aspect_ratio;
@@ -10,6 +11,8 @@ uniform vec3 object_rot;
 
 uniform vec3 camera_pos;
 uniform vec3 camera_rot;
+
+out vec2 texCoords;
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -38,6 +41,8 @@ mat4x4 translate(vec3 offset) {
 }
 
 void main() {
+    texCoords = atexCoords;
+
     float far = 100.0f;
     float near = 0.1f;
     float FOV = M_PI / 2;
