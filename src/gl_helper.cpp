@@ -22,7 +22,7 @@ constexpr uint32_t DEFAULT_IMG_INIT_FLAGS = IMG_INIT_PNG;
 
 void Init_SDL_and_GL() {
     assert(SDL_Init(DEFAULT_SDL_INIT_FLAGS) == 0);
-    //assert(IMG_Init(DEFAULT_IMG_INIT_FLAGS) == DEFAULT_IMG_INIT_FLAGS);
+    assert(IMG_Init(DEFAULT_IMG_INIT_FLAGS) == DEFAULT_IMG_INIT_FLAGS);
 
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3) == 0);
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2) == 0);
@@ -33,7 +33,7 @@ void Init_SDL_and_GL() {
     assert(SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1") == SDL_TRUE);
 }
 void Quit_SDL_and_GL() {
-    //IMG_Quit();
+    IMG_Quit();
     SDL_Quit();
 }
 
@@ -102,12 +102,41 @@ unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::s
 
     return shaderProgram;
 }
+uint32_t LoadImage(const std::string &imagePath) {
+    SDL_Surface *original = IMG_Load(imagePath.c_str());
+    assert(original);
+
+    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 24, SDL_PIXELFORMAT_RGB24);
+    //SDL_BlitSurface(original, nullptr, other, nullptr);
+    for (int i = 0; i < original->h; ++i) {
+        SDL_Rect source = { 0, i, original->w, 1 };
+        SDL_Rect dest = { 0, original->h - 1 - i, modified->w, 1 };
+        SDL_BlitSurface(original, &source, modified, &dest);
+    }
+
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, modified->w, modified->h, 0, GL_RGB, GL_UNSIGNED_BYTE, modified->pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    SDL_FreeSurface(modified);
+    SDL_FreeSurface(original);
+
+    return texture;
+}
 
 
 // Assume that the gl types are the same as the cpp types
 static_assert(std::is_same<uint32_t, GLuint>::value);
 static_assert(std::is_same<int32_t, GLint>::value);
 static_assert(std::is_same<float, GLfloat>::value);
+static_assert(std::is_same<int, GLsizei>::value);
 
 // Assume the glm types are tightly packed
 static_assert(sizeof(glm::vec3) == sizeof(std::array<float, 3>));

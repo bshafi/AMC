@@ -41,3 +41,4 @@ CMakeFiles/*
 _3rdParty/*
 MakeFile
 CMakeCache.txt
+.DS_Store

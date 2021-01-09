@@ -8,6 +8,7 @@
 #include <cassert>
 #include <stdint.h>
 #include <iostream>
+#include <vector>
 
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
@@ -16,6 +17,7 @@ constexpr int INITIAL_WINDOW_WIDTH = 640;
 constexpr int INITIAL_WINDOW_HEIGHT = 480;
 constexpr uint32_t DEFAULT_SDL_WINDOW_FLAGS = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
 constexpr uint32_t FPS = 60;
+
 
 int main(const int, const char**) {
     Init_SDL_and_GL();
@@ -51,18 +53,10 @@ int main(const int, const char**) {
     uint32_t ticks = SDL_GetTicks();
     float delta_time_s = 0.0f;
 
-    glm::vec3 camera_position = { 0.0f, 0.0f, 0.0f };
-    // 3 
-    glm::mat3x3 camera_orientation = {
-        glm::vec3(1.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        glm::vec3(0.0f, 0.0f, 1.0f)
-    };
-
     bool is_running = true;
     std::vector<SDL_Event> events;
+    bool cursor_show = true;
     while (is_running) {
-
         events.clear();
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
             switch (event.type) {
@@ -75,8 +69,9 @@ int main(const int, const char**) {
                 }
             }
                 break;
-            default: events.push_back(event); break;
+            default: break;
             }
+            events.push_back(event); 
         }
         hc.update(events);
 
