@@ -2,6 +2,10 @@
 
 #include <glm/glm.hpp>
 
+/*
+  Hello Cube is a simple rotating textured cube to test the setup of opengl and SDL2
+  this will most likely be used to as a small test bed
+ */
 class HelloCube {
 public:
     HelloCube();
