@@ -8,6 +8,7 @@
 #include <cassert>
 #include <stdint.h>
 #include <iostream>
+#include <vector>
 
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
@@ -16,6 +17,7 @@ constexpr int INITIAL_WINDOW_WIDTH = 640;
 constexpr int INITIAL_WINDOW_HEIGHT = 480;
 constexpr uint32_t DEFAULT_SDL_WINDOW_FLAGS = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
 constexpr uint32_t FPS = 60;
+
 
 int main(const int, const char**) {
     Init_SDL_and_GL();
@@ -32,19 +34,19 @@ int main(const int, const char**) {
     SDL_GLContext sdl_glcontext = SDL_GL_CreateContext(window);
     assert(sdl_glcontext);
 
-    auto glewError = glewInit();
-    if (glewError != GLEW_OK) {
-        printf("%s\n", glewGetErrorString(glewError));
+    {
+        GLenum glewError = glewInit();
+        if (glewError != GLEW_OK) {
+            printf("%s\n", glewGetErrorString(glewError));
+        }
     }
 
+    glEnable(GL_DEPTH_TEST);
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 
     int width, height;
     SDL_GL_GetDrawableSize(window, &width, &height);
     glViewport(0, 0, width, height);
-
-    
-    //unsigned int shader_program = LoadShaderProgram("shaders/hello_cube.vert", "shaders/hello_cube.frag");
 
     HelloCube hc;
 
@@ -52,17 +54,28 @@ int main(const int, const char**) {
     float delta_time_s = 0.0f;
 
     bool is_running = true;
+    std::vector<SDL_Event> events;
+    bool cursor_show = true;
     while (is_running) {
+        events.clear();
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
             switch (event.type) {
-            case SDL_QUIT:
-                is_running = false;
-                break;
+            case SDL_QUIT: is_running = false; break;
+            case SDL_WINDOWEVENT: {
+                switch (event.window.type) {
+                case SDL_WINDOWEVENT_RESIZED:
+                    glViewport(0, 0, event.window.data1, event.window.data2);
+                    break;
+                }
             }
+                break;
+            default: break;
+            }
+            events.push_back(event); 
         }
-        hc.update();
+        hc.update(events);
 
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         hc.draw();
 
