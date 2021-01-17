@@ -12,6 +12,7 @@
 
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
+#include "chunk.hpp"
 
 constexpr int INITIAL_WINDOW_WIDTH = 640;
 constexpr int INITIAL_WINDOW_HEIGHT = 480;
@@ -48,7 +49,8 @@ int main(const int, const char**) {
     SDL_GL_GetDrawableSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
-    HelloCube hc;
+    //HelloCube hc;
+    Chunk ck(10);
 
     uint32_t ticks = SDL_GetTicks();
     float delta_time_s = 0.0f;
@@ -73,11 +75,13 @@ int main(const int, const char**) {
             }
             events.push_back(event); 
         }
-        hc.update(events);
+        //hc.update(events);
+        ck.update(events);
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        hc.draw();
+        //hc.draw();
+        ck.draw();
 
         SDL_GL_SwapWindow(window);
 

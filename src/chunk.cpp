@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "standard.hpp"
 
 #include "hello_cube.hpp"
@@ -13,7 +15,7 @@ constexpr glm::ivec3 INITIAL_CHUNK_POS = glm::ivec3(0, 0, 0);
 constexpr float INITIAL_ASPECT_RATIO = 640.0f / 480.0f;
 
 // TODO: Make the constructor specify the height and the location of the chunk
-Chunk::Chunk(uint32_t height) : slices(height) {
+Chunk::Chunk(uint32_t height) : slices(height), pitch{0.0f}, yaw{-M_PI_2}, camera_pos{glm::vec3()} {
     for (int i = 0; i < height; ++i) {
         slices.push_back(Slice());
     }
@@ -34,14 +36,10 @@ Chunk::Chunk(uint32_t height) : slices(height) {
     chunk_location = cube_shader_program->retrieve_shader_variable<glm::ivec3>("chunk_pos");
     chunk_location.set(INITIAL_CHUNK_POS);
 
-    camera_pos = cube_shader_program->retrieve_shader_variable<glm::vec3>("camera_pos");
-    camera_pos.set(INITIAL_CAMERA_POS);
-
-    camera_rot = cube_shader_program->retrieve_shader_variable<glm::vec3>("camera_rot");
-    camera_rot.set(INITIAL_CAMERA_ROT);
-
-    aspect_ratio = cube_shader_program->retrieve_shader_variable<float>("aspect_ratio");
-    aspect_ratio.set(INITIAL_ASPECT_RATIO);
+    this->projection = cube_shader_program->retrieve_shader_variable<glm::mat4>("projection");
+    this->projection.set(glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f));
+    this->view = cube_shader_program->retrieve_shader_variable<glm::mat4>("view");
+    this->view.set(glm::lookAt(camera_pos, camera_pos + forward, glm::vec3(0, 1, 0)));
 
     cube_shader_program->bind_texture_to_sampler_2D({
             { "tex", *cube_texture }
@@ -68,53 +66,56 @@ Chunk::Chunk(uint32_t height) : slices(height) {
 
 void Chunk::draw() {
     cube_shader_program->use();
+    this->view.set(glm::lookAt(camera_pos, camera_pos + forward, glm::vec3(0, 1, 0)));
+    this->projection.set(this->projection.get());
+
     glBindVertexArray(VAO);
     glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, slices.size() * 256);
 }
 
-// TODO: Remove this
-glm::mat4x4 myrotate(glm::vec3 rotation) {
-    float a = rotation.z;
-    float b = rotation.y;
-    float c = rotation.x;
-
-
-    return glm::transpose(glm::mat4x4(
-        cos(a) * cos(b), cos(a) * sin(b) * sin(c) - sin(a) * cos(c), cos(a) * sin(b) * cos(c) + sin(a) * sin(c), 0.0f,
-        sin(a) * cos(b), sin(a) * sin(b) * sin(c) + cos(a) * cos(c), sin(a) * sin(b) * cos(c) - cos(a) * sin(c), 0.0f,
-                -sin(b),                            cos(b) * sin(c),                            cos(b) * cos(c), 0.0f,
-                   0.0f,                                       0.0f,                                       0.0f, 1.0f
-    ));
-}
-
 void Chunk::update(const std::vector<SDL_Event> &events) {
-    cube_shader_program->use();
     const auto keypresses = SDL_GetKeyboardState(NULL);
 
-    const glm::vec3 forward = myrotate(camera_rot.get()) * glm::vec4(0.0, 0.0, 1.0, 1.0f);
+    glm::vec3 right = glm::cross(forward, glm::vec3(0, 1, 0));
+    glm::vec3 up = glm::cross(forward, right);
 
     if (keypresses[SDL_SCANCODE_A]) {
-        camera_pos.set(camera_pos.get() + glm::vec3(0.1, 0, 0));
+       camera_pos -= right * 0.1f;
     }
     if (keypresses[SDL_SCANCODE_D]) {
-        camera_pos.set(camera_pos.get() + glm::vec3(-0.1, 0, 0));
+        camera_pos += right * 0.1f;
     }
     if (keypresses[SDL_SCANCODE_S])  {
-        camera_pos.set(camera_pos.get() + glm::vec3(0, 0.1, 0));
-    }if (keypresses[SDL_SCANCODE_W])  {
-        //camera_pos.set(camera_pos.get() + glm::vec3(0, -0.1, 0));
-        camera_pos.set(camera_pos.get() + forward * -0.1f);
+        camera_pos -= 0.1f * forward;
+    }
+    if (keypresses[SDL_SCANCODE_W])  {
+        camera_pos += 0.1f * forward;
     }
     if (keypresses[SDL_SCANCODE_I]) {
-        camera_pos.set(camera_pos.get() + glm::vec3(0, 0, 0.1));
     }
     if (keypresses[SDL_SCANCODE_K]) {
-        camera_pos.set(camera_pos.get() + glm::vec3(0, 0, -0.1));
     }
     if (keypresses[SDL_SCANCODE_LEFT]) {
-        camera_rot.set(camera_rot.get() + glm::vec3(0, 0.01 * M_PI_2, 0));
     }
     if (keypresses[SDL_SCANCODE_RIGHT]) {
-        camera_rot.set(camera_rot.get() + glm::vec3(0, -0.01 * M_PI_2, 0));
     }
+
+    for (const auto event : events) {
+        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            SDL_SetRelativeMouseMode(SDL_TRUE);
+        }
+        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+            SDL_SetRelativeMouseMode(SDL_FALSE);
+        }
+        if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
+            yaw += (M_PI * event.motion.xrel) / 1000.0f;
+            pitch -= (M_PI * event.motion.yrel) / 1000.0f;
+        }
+    }
+
+    forward = glm::normalize(glm::vec3(
+        cos(yaw) * cos(pitch),
+        sin(pitch),
+        sin(yaw) * cos(pitch)
+    ));
 }

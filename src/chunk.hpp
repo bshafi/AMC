@@ -25,10 +25,13 @@ struct Chunk {
     // slices[z][x][y]
     std::vector<Slice> slices;
     Uniform<glm::ivec3> chunk_location;
-    Uniform<glm::vec3> camera_pos;
-    Uniform<glm::vec3> camera_rot;
+    Uniform<glm::mat4x4> view;
+    Uniform<glm::mat4x4> projection;
     Uniform<float> aspect_ratio;
+    glm::vec3 camera_pos;
+    glm::vec3 forward;
     unsigned VAO, block_ids_VBO;
+    float pitch, yaw;
 
     Chunk(uint32_t height);
     void draw();
