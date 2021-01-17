@@ -47,5 +47,5 @@ hunter_add_package(glm)
 find_package(glm REQUIRED)
 list(APPEND TEMP_LIBRARIES glm)
 
-add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp)
+add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/chunk.cpp)
 target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})

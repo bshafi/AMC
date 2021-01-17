@@ -83,38 +83,16 @@ unsigned Texture::get_id() const {
 void GLFunctionsWrapper::setFloat(int loc, const float &flt) {
     glUniform1f(loc, flt);
 }
-float GLFunctionsWrapper::getFloat(int loc, int shader) {
-    float f;
-    glGetnUniformfv(shader, loc, 1, &f);
-    return f;
-}
 
 void GLFunctionsWrapper::setvec3(int loc, const glm::vec3 &v) {
     glUniform3f(loc, v.x, v.y, v.z);
 }
-glm::vec3 GLFunctionsWrapper::getvec3(int loc, int shader) {
-    CHECK_IF_GL_IS_OK();
-    float f[3];
-    glGetnUniformfv(shader, loc, 3, f);
-    return glm::vec3(f[0], f[1], f[2]);
-}
-
 void GLFunctionsWrapper::setvec2(int loc, const glm::vec2 &v) {
     glUniform2f(loc, v.x, v.y);
-}
-glm::vec2 GLFunctionsWrapper::getvec2(int loc, int shader) {
-    float f[2];
-    glGetnUniformfv(shader, loc, 2, f);
-    return glm::vec2(f[0], f[1]);
 }
 
 void GLFunctionsWrapper::setuvec2(int loc, const glm::uvec2 &v) {
     glUniform2ui(loc, v.x, v.y);
-}
-glm::uvec2 GLFunctionsWrapper::getuvec2(int loc, int shader) {
-    unsigned u[2];
-    glGetnUniformuiv(shader, loc, 2, u);
-    return glm::uvec2(u[0], u[1]);
 }
 int GLFunctionsWrapper::getUniformLocation(int shader_program, const std::string &name) {
     return glGetUniformLocation(shader_program, name.c_str());
@@ -122,12 +100,6 @@ int GLFunctionsWrapper::getUniformLocation(int shader_program, const std::string
 
 void GLFunctionsWrapper::setivec3(int loc, const glm::ivec3 &v) {
     glUniform3i(loc, v.x, v.y, v.z);
-    CHECK_IF_GL_IS_OK();
-}
-glm::ivec3 GLFunctionsWrapper::getivec3(int loc, int shader) {
-    int i[3];
-    glGetnUniformiv(shader, loc, 3, i);
-    return glm::ivec3(i[0], i[1], i[2]);
 }
 
 void GLFunctionsWrapper::setmat4x4(int loc, const glm::mat4x4 &m) {
