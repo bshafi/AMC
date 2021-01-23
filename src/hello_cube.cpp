@@ -1,17 +1,6 @@
-#include <GL/glew.h>
-
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL_ttf/SDL_ttf.h>
-
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
 #include <array>
 
 #include "gl_helper.hpp"
-
 #include "hello_cube.hpp"
 
 const std::array<float, 6 * 6 * 5> cube_vertices = {
