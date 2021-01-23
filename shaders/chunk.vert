@@ -7,14 +7,13 @@ layout (location = 2) in uint block_id;
 // TODO: Change this to an ivec2 and add a uniform int for a height
 uniform ivec3 chunk_pos;
 
-// TODO: Move all the global variables into a uniform buffer
-
-// TODO: Replace object_pos, object_rot, camera_pos, and camera_rot with a mat4x4 view and projection matrix
-
-uniform mat4x4 view;
-uniform mat4x4 projection;
+layout (std140) uniform globals_3d {
+    mat4x4 view;
+    mat4x4 projection;
+};
 
 out vec2 texCoords;
+flat out uint ablock_id;
 
 #define M_PI 3.1415926535897932384626433832795
 
@@ -41,6 +40,8 @@ mat4x4 translate(vec3 offset) {
 }
 
 void main() {
+    ablock_id = block_id;
+
     int local_y = gl_InstanceID / 256;
     int local_x = (gl_InstanceID % 256) % 16;
     int local_z = (gl_InstanceID % 256) / 16;
