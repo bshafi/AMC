@@ -1,10 +1,3 @@
-#include <GL/glew.h>
-
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl_glext.h>
-#include <SDL2/SDL_image.h>
-#include <SDL_ttf/SDL_ttf.h>
-
 #include <cassert>
 #include <stdint.h>
 #include <iostream>
@@ -13,6 +6,7 @@
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
 #include "chunk.hpp"
+#include "camera.hpp"
 
 constexpr int INITIAL_WINDOW_WIDTH = 640;
 constexpr int INITIAL_WINDOW_HEIGHT = 480;
@@ -49,11 +43,26 @@ int main(const int, const char**) {
     SDL_GL_GetDrawableSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
-    //HelloCube hc;
-    Chunk ck(10);
-
     uint32_t ticks = SDL_GetTicks();
-    float delta_time_s = 0.0f;
+
+    Camera camera;
+    Chunk ck;
+
+    unsigned globals_3d_ubo;
+    {
+        glGenBuffers(1, &globals_3d_ubo);
+        glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
+        glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_DYNAMIC_DRAW);
+        glm::mat4 view = camera.view_matrix();
+        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
+        glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f);
+        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
+
+        ck.shader.bind_UBO("globals_3d", 0);
+        glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
+
+        ASSERT_ON_GL_ERROR();
+    }
 
     bool is_running = true;
     std::vector<SDL_Event> events;
@@ -73,15 +82,49 @@ int main(const int, const char**) {
                 break;
             default: break;
             }
-            events.push_back(event); 
+            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+                SDL_SetRelativeMouseMode(SDL_TRUE);
+            }
+            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+                SDL_SetRelativeMouseMode(SDL_FALSE);
+            }
+            if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
+                camera.rotate_right(M_PI * event.motion.xrel / 1000.0f);
+                camera.rotate_upwards(-M_PI * event.motion.yrel / 1000.0f);
+            }
+            events.push_back(event);
         }
-        //hc.update(events);
-        ck.update(events);
+        {
+            const auto keypresses = SDL_GetKeyboardState(NULL);
+            if (keypresses[SDL_SCANCODE_A]) {
+                camera.pos(camera.pos() - camera.right() * 0.1f);
+            }
+            if (keypresses[SDL_SCANCODE_D]) {
+                camera.pos(camera.pos() + camera.right() * 0.1f);
+            }
+            if (keypresses[SDL_SCANCODE_S])  {
+                camera.pos(camera.pos() - camera.forward() * 0.1f);
+            }
+            if (keypresses[SDL_SCANCODE_W])  {
+                camera.pos(camera.pos() + camera.forward() * 0.1f);
+            }
+        }
+        ASSERT_ON_GL_ERROR();
+
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        //hc.draw();
-        ck.draw();
+        {
+            glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
+            glm::mat4 view = camera.view_matrix();
+            glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
+            glBindBuffer(GL_UNIFORM_BUFFER, 0);
+            ASSERT_ON_GL_ERROR();
+
+            ck.draw();
+
+            ASSERT_ON_GL_ERROR();
+        }
 
         SDL_GL_SwapWindow(window);
 
