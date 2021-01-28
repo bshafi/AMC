@@ -1,40 +1,20 @@
 #pragma once
 
 #include <glm/glm.hpp>
-#include <optional>
-#include <vector>
-#include <map>
 #include <string>
-#include <type_traits>
 #include <cassert>
-
-// TODO: Move this to a better place
-template <typename T>
-struct always_false {
-    static const bool value = false;
-};
 
 /*
     The GLFunctions wrapper provides access to opengl functions such as glUniform1i without
     polluting the global namespace. These functions should only be used in the Uniform class.
  */
 namespace GLFunctionsWrapper {
-    // TODO: Remove the get functions since they are no longer needed
+    void setuint(int loc, const uint32_t &i);
     void setFloat(int loc, const float &flt);
-    float getFloat(int loc, int shader);
-
     void setvec3(int loc, const glm::vec3 &);
-    glm::vec3 getvec3(int loc, int shader);
-
     void setvec2(int loc, const glm::vec2 &);
-    glm::vec2 getvec2(int loc, int shader);
-
     void setuvec2(int loc, const glm::uvec2 &);
-    glm::uvec2 getuvec2(int loc, int shader);
-
     void setivec3(int loc, const glm::ivec3 &);
-    glm::ivec3 getivec3(int loc, int shader);
-
     void setmat4x4(int loc, const glm::mat4x4 &);
 
     int getUniformLocation(int shader_program, const std::string &name);
@@ -43,7 +23,16 @@ namespace GLFunctionsWrapper {
     template <typename T>
     struct shader_is_implemented {
         static const bool value = std::is_same<T, float>::value || std::is_same<T, glm::vec3>::value || std::is_same<T, glm::vec2>::value ||
-                            std::is_same<T, glm::uvec2>::value || std::is_same<T, glm::ivec3>::value || std::is_same<T, glm::mat4x4>::value;
+                            std::is_same<T, glm::uvec2>::value || std::is_same<T, glm::ivec3>::value || std::is_same<T, glm::mat4x4>::value ||
+                            std::is_same<T, uint32_t>::value;
+    };
+
+    // This forces the static_assert to evaluate on the type argument rather than evaluating
+    // all the time
+    // This allows the enforcement of certain types being implemented
+    template <typename T>
+    struct always_false {
+        static const bool value = false;
     };
 };
 
@@ -90,13 +79,19 @@ public:
     Uniform<T> retrieve_shader_variable(const std::string &variable_name) {
         static_assert(GLFunctionsWrapper::shader_is_implemented<T>::value, "You need to implement this type");
         assert(this->shader_program != 0);
+
+        this->use();
+    
         return Uniform<T>(GLFunctionsWrapper::getUniformLocation(shader_program, variable_name));
+
     }
     
     void use();
 
-    // TODO: change the name to bind textures
     void bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<Texture>>> &bindings);
+
+    // FIXME: This is a bit of a hack 
+    void bind_UBO(const std::string &ubo_name, unsigned int loc);
 
     // Only for use within the shader.hpp file
     unsigned get_shader_program() const {
@@ -129,8 +124,10 @@ private:
 
 template <typename T>
 void Uniform<T>::set(const T &val) {
-    this->value = val;
-    if constexpr(std::is_same<T, float>::value) {
+    this->value = val; 
+    if constexpr (std::is_same<T, uint32_t>::value) {
+        GLFunctionsWrapper::setuint(loc, val);
+    } else if constexpr(std::is_same<T, float>::value) {
         GLFunctionsWrapper::setFloat(loc, val);
     } else if constexpr(std::is_same<T, glm::vec1>::value) {
         GLFunctionsWrapper::setFloat(loc, val.x);
@@ -146,7 +143,7 @@ void Uniform<T>::set(const T &val) {
         GLFunctionsWrapper::setmat4x4(loc, val);
     } else {
         // if the type has not been implemented this function will fail at compile time
-        static_assert(always_false<T>::value);
+        static_assert(GLFunctionsWrapper::always_false<T>::value);
     }
 }
 
@@ -156,6 +153,6 @@ T Uniform<T>::get() const {
         return this->value;
     } else {
         // if the type has not been implemented this function will fail at compile time
-        static_assert(always_false<T>::value);
+        static_assert(GLFunctionsWrapper::always_false<T>::value);
     }
 }

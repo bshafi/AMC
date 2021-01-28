@@ -1,28 +1,27 @@
-#include <GL/glew.h>
-
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_opengl_glext.h>
-#include <SDL2/SDL_image.h>
-#include <SDL_ttf/SDL_ttf.h>
-
-#include <glm/glm.hpp>
 #include <array>
-
-#include <cassert>
-#include <cstdint>
-#include <iostream>
 #include <fstream>
-
-#include <type_traits>
+#include <iostream>
 
 #include "gl_helper.hpp"
 
 constexpr uint32_t DEFAULT_SDL_INIT_FLAGS = SDL_INIT_EVERYTHING;
 constexpr uint32_t DEFAULT_IMG_INIT_FLAGS = IMG_INIT_PNG;
+constexpr uint32_t DEFAULT_FONT_SIZE = 24;
+constexpr SDL_Color WHITE = { 255, 255, 255, 255 };
+
+TTF_Font *default_font = nullptr;
+
+uint32_t WINDOW_TRUE_RESIZE_EVENT;
+uint32_t SCENE_CHANGE_EVENT;
+
 
 void Init_SDL_and_GL() {
     assert(SDL_Init(DEFAULT_SDL_INIT_FLAGS) == 0);
     assert(IMG_Init(DEFAULT_IMG_INIT_FLAGS) == DEFAULT_IMG_INIT_FLAGS);
+    assert(TTF_Init() == 0);
+
+    default_font = TTF_OpenFont("resources/cmuntt.ttf", DEFAULT_FONT_SIZE);
+    assert(default_font);
 
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3) == 0);
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2) == 0);
@@ -31,12 +30,45 @@ void Init_SDL_and_GL() {
 
     //SDL_SetHint(SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG, "1");
     assert(SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1") == SDL_TRUE);
+
+    WINDOW_TRUE_RESIZE_EVENT = SDL_RegisterEvents(1);
+    assert(WINDOW_TRUE_RESIZE_EVENT != (uint32_t)-1);
+    SCENE_CHANGE_EVENT = SDL_RegisterEvents(1);
+    assert(SCENE_CHANGE_EVENT != (uint32_t)-1);
 }
 void Quit_SDL_and_GL() {
+
+    TTF_CloseFont(default_font);
+
     IMG_Quit();
+    TTF_Quit();
     SDL_Quit();
 }
 
+void PushWindowTrueResizeEvent(int width, int height) {
+    SDL_Event event;
+    SDL_zero(event);
+
+    event.type = WINDOW_TRUE_RESIZE_EVENT;
+    event.user.data1 = reinterpret_cast<void*>(static_cast<intptr_t>(width));
+    event.user.data2 = reinterpret_cast<void*>(static_cast<intptr_t>(height));
+    if (SDL_PushEvent(&event) != 1) {
+        printf("Could not push window true resize event\n");
+    }
+}
+
+void PushSceneChangeEvent(const SceneChangeData &_scene_change_data) {
+    auto *scene_change_data = new SceneChangeData(_scene_change_data);
+
+    SDL_Event event;
+    SDL_zero(event);
+
+    event.type = SCENE_CHANGE_EVENT;
+    event.user.data1 = static_cast<void*>(scene_change_data);
+    if (SDL_PushEvent(&event) != 1) {
+        printf("Could not push scene change event\n");
+    }
+}
 
 unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
     std::ifstream vertexShaderFile(vertexShaderPath), 
@@ -102,11 +134,12 @@ unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::s
 
     return shaderProgram;
 }
+
 uint32_t LoadImage(const std::string &imagePath) {
     SDL_Surface *original = IMG_Load(imagePath.c_str());
     assert(original);
 
-    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 24, SDL_PIXELFORMAT_RGB24);
+    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
     //SDL_BlitSurface(original, nullptr, other, nullptr);
     for (int i = 0; i < original->h; ++i) {
         SDL_Rect source = { 0, i, original->w, 1 };
@@ -122,7 +155,7 @@ uint32_t LoadImage(const std::string &imagePath) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, modified->w, modified->h, 0, GL_RGB, GL_UNSIGNED_BYTE, modified->pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, modified->w, modified->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, modified->pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     SDL_FreeSurface(modified);
@@ -131,12 +164,63 @@ uint32_t LoadImage(const std::string &imagePath) {
     return texture;
 }
 
+uint32_t RasterizeText(const std::string &text) {
+    assert(default_font);
+
+    SDL_Surface *original = TTF_RenderText_Blended(default_font, text.c_str(), WHITE);
+    assert(original);
+
+    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
+    //SDL_BlitSurface(original, nullptr, other, nullptr);
+    for (int i = 0; i < original->h; ++i) {
+        SDL_Rect source = { 0, i, original->w, 1 };
+        SDL_Rect dest = { 0, original->h - 1 - i, modified->w, 1 };
+        SDL_BlitSurface(original, &source, modified, &dest);
+    }
+
+    unsigned int texture;
+    glGenTextures(1, &texture);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, modified->w, modified->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, modified->pixels);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    SDL_FreeSurface(modified);
+    SDL_FreeSurface(original);
+
+    return texture;
+}
+
+bool glBreakOnError() {
+    GLenum error_code = glGetError();
+    if (error_code == GL_NO_ERROR) {
+        return false;
+    }
+
+    // TODO: Make this more comprehesive and clean
+    switch (error_code) {
+    case GL_INVALID_ENUM: std::cout << "GL_INVALID_ENUM" << std::endl; break;
+    case GL_INVALID_OPERATION: std::cout << "GL_INVALID_OPERATION" << std::endl; break;
+    case GL_INVALID_VALUE: std::cout << "GL_INVALID_VALUE" << std::endl; break;
+    default:
+        std::cout << "GL unkown error " << reinterpret_cast<void*>(error_code) << std::endl;
+        break;
+    }
+
+    return true;
+}
+
 
 // Assume that the gl types are the same as the cpp types
 static_assert(std::is_same<uint32_t, GLuint>::value);
 static_assert(std::is_same<int32_t, GLint>::value);
 static_assert(std::is_same<float, GLfloat>::value);
 static_assert(std::is_same<int, GLsizei>::value);
+static_assert(std::is_same<GLenum, unsigned>::value);
 
 // Assume the glm types are tightly packed
 static_assert(sizeof(glm::vec3) == sizeof(std::array<float, 3>));

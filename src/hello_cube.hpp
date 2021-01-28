@@ -8,6 +8,8 @@
 
 union SDL_Event;
 
+const extern std::array<float, 6 * 6 * 5> cube_vertices;
+
 /*
   Hello Cube is a simple rotating textured cube to test the setup of opengl and SDL2
   this will most likely be used to as a small test bed
