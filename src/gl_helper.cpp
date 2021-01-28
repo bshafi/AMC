@@ -11,12 +11,17 @@ constexpr SDL_Color WHITE = { 255, 255, 255, 255 };
 
 TTF_Font *default_font = nullptr;
 
+uint32_t WINDOW_TRUE_RESIZE_EVENT;
+uint32_t SCENE_CHANGE_EVENT;
+
+
 void Init_SDL_and_GL() {
     assert(SDL_Init(DEFAULT_SDL_INIT_FLAGS) == 0);
     assert(IMG_Init(DEFAULT_IMG_INIT_FLAGS) == DEFAULT_IMG_INIT_FLAGS);
     assert(TTF_Init() == 0);
 
-    default_font = TTF_OpenFont("resources/cmuntt.ttf", 24);
+    default_font = TTF_OpenFont("resources/cmuntt.ttf", DEFAULT_FONT_SIZE);
+    assert(default_font);
 
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3) == 0);
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2) == 0);
@@ -25,6 +30,11 @@ void Init_SDL_and_GL() {
 
     //SDL_SetHint(SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG, "1");
     assert(SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1") == SDL_TRUE);
+
+    WINDOW_TRUE_RESIZE_EVENT = SDL_RegisterEvents(1);
+    assert(WINDOW_TRUE_RESIZE_EVENT != (uint32_t)-1);
+    SCENE_CHANGE_EVENT = SDL_RegisterEvents(1);
+    assert(SCENE_CHANGE_EVENT != (uint32_t)-1);
 }
 void Quit_SDL_and_GL() {
 
@@ -35,6 +45,30 @@ void Quit_SDL_and_GL() {
     SDL_Quit();
 }
 
+void PushWindowTrueResizeEvent(int width, int height) {
+    SDL_Event event;
+    SDL_zero(event);
+
+    event.type = WINDOW_TRUE_RESIZE_EVENT;
+    event.user.data1 = reinterpret_cast<void*>(static_cast<intptr_t>(width));
+    event.user.data2 = reinterpret_cast<void*>(static_cast<intptr_t>(height));
+    if (SDL_PushEvent(&event) != 1) {
+        printf("Could not push window true resize event\n");
+    }
+}
+
+void PushSceneChangeEvent(const SceneChangeData &_scene_change_data) {
+    auto *scene_change_data = new SceneChangeData(_scene_change_data);
+
+    SDL_Event event;
+    SDL_zero(event);
+
+    event.type = SCENE_CHANGE_EVENT;
+    event.user.data1 = static_cast<void*>(scene_change_data);
+    if (SDL_PushEvent(&event) != 1) {
+        printf("Could not push scene change event\n");
+    }
+}
 
 unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
     std::ifstream vertexShaderFile(vertexShaderPath), 
@@ -105,7 +139,7 @@ uint32_t LoadImage(const std::string &imagePath) {
     SDL_Surface *original = IMG_Load(imagePath.c_str());
     assert(original);
 
-    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 24, SDL_PIXELFORMAT_RGB24);
+    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
     //SDL_BlitSurface(original, nullptr, other, nullptr);
     for (int i = 0; i < original->h; ++i) {
         SDL_Rect source = { 0, i, original->w, 1 };
@@ -121,7 +155,7 @@ uint32_t LoadImage(const std::string &imagePath) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, modified->w, modified->h, 0, GL_RGB, GL_UNSIGNED_BYTE, modified->pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, modified->w, modified->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, modified->pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     SDL_FreeSurface(modified);
@@ -136,7 +170,7 @@ uint32_t RasterizeText(const std::string &text) {
     SDL_Surface *original = TTF_RenderText_Blended(default_font, text.c_str(), WHITE);
     assert(original);
 
-    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 24, SDL_PIXELFORMAT_RGB24);
+    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
     //SDL_BlitSurface(original, nullptr, other, nullptr);
     for (int i = 0; i < original->h; ++i) {
         SDL_Rect source = { 0, i, original->w, 1 };
@@ -152,7 +186,7 @@ uint32_t RasterizeText(const std::string &text) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, modified->w, modified->h, 0, GL_RGB, GL_UNSIGNED_BYTE, modified->pixels);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, modified->w, modified->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, modified->pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
 
     SDL_FreeSurface(modified);
