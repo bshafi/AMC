@@ -2,17 +2,19 @@
 #include <stdint.h>
 #include <iostream>
 #include <vector>
+#include <map>
 
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
 #include "chunk.hpp"
 #include "camera.hpp"
+#include "world.hpp"
+#include "gui.hpp"
 
 constexpr int INITIAL_WINDOW_WIDTH = 640;
 constexpr int INITIAL_WINDOW_HEIGHT = 480;
 constexpr uint32_t DEFAULT_SDL_WINDOW_FLAGS = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
-constexpr uint32_t FPS = 60;
-
+constexpr uint32_t FPS = 30;
 
 int main(const int, const char**) {
     Init_SDL_and_GL();
@@ -29,101 +31,131 @@ int main(const int, const char**) {
     SDL_GLContext sdl_glcontext = SDL_GL_CreateContext(window);
     assert(sdl_glcontext);
 
-    {
-        GLenum glewError = glewInit();
-        if (glewError != GLEW_OK) {
-            printf("%s\n", glewGetErrorString(glewError));
-        }
-    }
+    assert(glewInit() == GLEW_OK);
 
     glEnable(GL_DEPTH_TEST);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+    glClearColor(0.3f, 0.f, 0.f, 1.0f);
 
     int width, height;
     SDL_GL_GetDrawableSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
+    GameState game_state = GameState::TitleScreen;
+
+    ASSERT_ON_GL_ERROR();
+
+    GUI title_screen;
+    title_screen.load_images({
+        { "resources/title_image.png", Image{ { -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 }},
+        { "resources/title.png",       Image{ { -.5, .4, 1, .4   }, { 0, 0, 1, 1 }, 1 }},
+        { "resources/play.png", Button{Image{ { -.1, -.9, .2, .1 }, { 0, 0, 1, 1 }, 0 }, 0 }}
+    });
+    GUI save_select_screen;
+    save_select_screen.load_images({
+        { "resources/title_image.png", Image{{ -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 }},
+        { "resources/save0.png", Button{ Image{{-0.5, 0.3, 1, 0.5 }, {0, 0, 1, 1}}, 0}},
+        { "resources/save1.png", Button{ Image{{-0.5, -0.2, 1, 0.5 }, {0, 0, 1, 1}}, 1}},
+        { "resources/save2.png", Button{ Image{{-0.5, -0.7, 1, 0.5 }, {0, 0, 1, 1}}, 2}}
+    });
+
+    ASSERT_ON_GL_ERROR();
+
+    World world;
+
+    //world.save_world("saves/test.txt");
+
     uint32_t ticks = SDL_GetTicks();
-
-    Camera camera;
-    Chunk ck;
-
-    unsigned globals_3d_ubo;
-    {
-        glGenBuffers(1, &globals_3d_ubo);
-        glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-        glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_DYNAMIC_DRAW);
-        glm::mat4 view = camera.view_matrix();
-        glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-        glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f);
-        glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
-
-        ck.shader.bind_UBO("globals_3d", 0);
-        glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
-
-        ASSERT_ON_GL_ERROR();
-    }
-
     bool is_running = true;
     std::vector<SDL_Event> events;
-    bool cursor_show = true;
     while (is_running) {
         events.clear();
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
             switch (event.type) {
             case SDL_QUIT: is_running = false; break;
             case SDL_WINDOWEVENT: {
-                switch (event.window.type) {
+                switch (event.window.event) {
                 case SDL_WINDOWEVENT_RESIZED:
-                    glViewport(0, 0, event.window.data1, event.window.data2);
+                    int w, h;
+                    SDL_GL_GetDrawableSize(window, &w, &h);
+                    PushWindowTrueResizeEvent(w, h);
+                    // glViewport(0, 0, w, h);
+                    // don't handle the resize here, handle it in WINDOW_TRUE_RESIZE_EVENT
+                    break;
+                default:
                     break;
                 }
             }
                 break;
-            default: break;
-            }
-            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-                SDL_SetRelativeMouseMode(SDL_TRUE);
-            }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
-                SDL_SetRelativeMouseMode(SDL_FALSE);
-            }
-            if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
-                camera.rotate_right(M_PI * event.motion.xrel / 1000.0f);
-                camera.rotate_upwards(-M_PI * event.motion.yrel / 1000.0f);
+            default:
+                if (event.type == WINDOW_TRUE_RESIZE_EVENT) {
+                    intptr_t w = reinterpret_cast<intptr_t>(event.user.data1), h = reinterpret_cast<intptr_t>(event.user.data2);
+                    glViewport(0, 0, static_cast<int>(w), static_cast<int>(h));
+                }
+                if (event.type == SCENE_CHANGE_EVENT) {
+                    SceneChangeData *scd = static_cast<SceneChangeData*>(event.user.data1);
+                    assert(scd);
+
+                    switch (scd->next_game_state) {
+                    case GameState::TitleScreen:
+                        game_state = GameState::TitleScreen;
+                        break;
+                    case GameState::SaveSelect:
+                        game_state = GameState::SaveSelect;
+                        break;
+                    case GameState::GamePlay:
+                        // TODO: use world save data
+                        game_state = GameState::GamePlay;
+                        assert(scd->save_index.has_value());
+                        world.load_world("saves/save" + std::to_string(scd->save_index.value()) + ".txt");
+                        break;
+                    default:
+                        assert(false);
+                    }
+
+                    delete scd;
+                }
+            break;
             }
             events.push_back(event);
         }
-        {
-            const auto keypresses = SDL_GetKeyboardState(NULL);
-            if (keypresses[SDL_SCANCODE_A]) {
-                camera.pos(camera.pos() - camera.right() * 0.1f);
+
+        switch (game_state) {
+        case GameState::TitleScreen:
+            title_screen.handle_events(events);
+            if (title_screen.is_clicked(0)) {
+                game_state = GameState::SaveSelect;
             }
-            if (keypresses[SDL_SCANCODE_D]) {
-                camera.pos(camera.pos() + camera.right() * 0.1f);
+            break;
+        case GameState::GamePlay:
+            world.handle_events(events);
+            break;
+        case GameState::SaveSelect:
+            save_select_screen.handle_events(events);
+            for (int i = 0; i < 3; ++i) {
+                if (save_select_screen.is_clicked(i)) {
+                    PushSceneChangeEvent(SceneChangeData{ GameState::GamePlay, i });
+                }
             }
-            if (keypresses[SDL_SCANCODE_S])  {
-                camera.pos(camera.pos() - camera.forward() * 0.1f);
-            }
-            if (keypresses[SDL_SCANCODE_W])  {
-                camera.pos(camera.pos() + camera.forward() * 0.1f);
-            }
+            break;
         }
         ASSERT_ON_GL_ERROR();
 
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        {
-            glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-            glm::mat4 view = camera.view_matrix();
-            glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-            glBindBuffer(GL_UNIFORM_BUFFER, 0);
-            ASSERT_ON_GL_ERROR();
 
-            ck.draw();
-
-            ASSERT_ON_GL_ERROR();
+        switch (game_state) {
+        case GameState::TitleScreen:
+            title_screen.draw();
+            break;
+        case GameState::GamePlay:
+            world.draw();
+            break;
+        case GameState::SaveSelect:
+            save_select_screen.draw();
+            break;
         }
 
         SDL_GL_SwapWindow(window);
