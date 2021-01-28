@@ -42,3 +42,6 @@ _3rdParty/*
 MakeFile
 CMakeCache.txt
 .DS_Store
+
+# Save Backups
+backup/*
