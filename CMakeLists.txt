@@ -9,7 +9,7 @@ HunterGate(
 
 project(Hope)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -glldb")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -glldb -Wall -Werror")
 
 hunter_add_package(msgpack)
 find_package(msgpack CONFIG REQUIRED)
@@ -47,5 +47,5 @@ hunter_add_package(glm)
 find_package(glm REQUIRED)
 list(APPEND TEMP_LIBRARIES glm)
 
-add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/chunk.cpp src/camera.cpp)
+add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/chunk.cpp src/camera.cpp src/world.cpp src/gui.cpp)
 target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
