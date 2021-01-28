@@ -153,6 +153,6 @@ T Uniform<T>::get() const {
         return this->value;
     } else {
         // if the type has not been implemented this function will fail at compile time
-        static_assert(always_false<T>::value);
+        static_assert(GLFunctionsWrapper::always_false<T>::value);
     }
 }
