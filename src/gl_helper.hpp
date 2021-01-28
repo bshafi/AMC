@@ -23,6 +23,33 @@ bool glBreakOnError();
     #define ASSERT_ON_GL_ERROR() do {} while (false)
 #endif
 
+
+// do not modify
+// the event handle that gives the real window size event.user.data1xevent.user.data2
+// both data1 and data2 are of type intptr_t
+extern uint32_t WINDOW_TRUE_RESIZE_EVENT;
+extern uint32_t SCENE_CHANGE_EVENT;
+
+
+enum class GameState {
+    TitleScreen,
+    GamePlay,
+    SaveSelect
+};
+
+using Primitive = std::variant<int>;
+
+struct SceneChangeData {
+    GameState next_game_state;
+    std::optional<int> save_index;
+};
+
+
+void PushWindowTrueResizeEvent(int witdth, int height);
+
+// user.event.data1 is a SceneChangeData pointer which must only be freed by the main thread
+void PushSceneChangeEvent(const SceneChangeData &);
+
 unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::string &fragmentShaderPath);
 uint32_t LoadImage(const std::string &imagePath);
 uint32_t RasterizeText(const std::string &text);
