@@ -49,3 +49,12 @@ list(APPEND TEMP_LIBRARIES glm)
 
 add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/chunk.cpp src/camera.cpp src/world.cpp src/gui.cpp)
 target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
+
+string(TIMESTAMP CURRENT_DATE_TIME "%Y_%m_%d_%H_%M_%S")
+
+add_custom_command(
+    TARGET game POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+    ${CMAKE_CURRENT_LIST_DIR}/saves/
+    ${CMAKE_CURRENT_LIST_DIR}/backup/${CURRENT_DATE_TIME}/
+)
