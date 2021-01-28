@@ -63,11 +63,36 @@ Chunk::~Chunk() {
 
 
 void Chunk::draw() {
+    shader.bind_texture_to_sampler_2D({
+        { "orientation", orientation_texture },
+        { "blocks", blocks_texture }
+    });
+
     shader.use();
-    shader.retrieve_shader_variable<unsigned>("block_type_count").set(4);
 
     glBindVertexArray(VAO);
     glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
+
+    ASSERT_ON_GL_ERROR();
+}
+
+void Chunk::load_blocks(const std::array<BlockIDType, BLOCKS_IN_CHUNK> &blocks) {
+
+    glBindBuffer(GL_ARRAY_BUFFER, chunk_block_ids_VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(BlockIDType) * Chunk::BLOCKS_IN_CHUNK, blocks.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+}
+void Chunk::save_blocks(std::array<BlockIDType, BLOCKS_IN_CHUNK> &blocks) {
+    ASSERT_ON_GL_ERROR();
+
+    glBindBuffer(GL_ARRAY_BUFFER, this->chunk_block_ids_VBO);
+
+    //assert(sizeof((decltype(blocks)::value_type)) * blocks.size() == sizeof(BlockIDType) * BLOCKS_IN_CHUNK);
+    glGetBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(BlockIDType) * BLOCKS_IN_CHUNK, blocks.data());
+
+
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     ASSERT_ON_GL_ERROR();
 }

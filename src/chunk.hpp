@@ -25,6 +25,8 @@ struct Chunk {
     Texture blocks_texture;
     Shader shader;
 
+    void load_blocks(const std::array<BlockIDType, BLOCKS_IN_CHUNK> &blocks);
+    void save_blocks(std::array<BlockIDType, BLOCKS_IN_CHUNK> &blocks);
 
     Chunk();
     ~Chunk();
