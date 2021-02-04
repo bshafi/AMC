@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include "PerlinNoise.hpp"
+
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
 
@@ -54,6 +56,10 @@ World::World() :
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
     ASSERT_ON_GL_ERROR();
+
+    frequency = 4.f;
+    octaves = 4;
+    adjusting_mode = false;
 }
 World::~World() {
     this->save(save_name);
@@ -108,18 +114,44 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
         ASSERT_ON_GL_ERROR();
     }
 
+    const float speed = 1.0f;
+
     const auto keypresses = SDL_GetKeyboardState(NULL);
     if (keypresses[SDL_SCANCODE_A]) {
-        camera.pos(camera.pos() - camera.right() * 0.1f);
+        camera.pos(camera.pos() - camera.right() * speed);
     }
     if (keypresses[SDL_SCANCODE_D]) {
-        camera.pos(camera.pos() + camera.right() * 0.1f);
+        camera.pos(camera.pos() + camera.right() * speed);
     }
     if (keypresses[SDL_SCANCODE_S])  {
-        camera.pos(camera.pos() - camera.forward() * 0.1f);
+        camera.pos(camera.pos() - camera.forward() * speed);
     }
     if (keypresses[SDL_SCANCODE_W])  {
-        camera.pos(camera.pos() + camera.forward() * 0.1f);
+        camera.pos(camera.pos() + camera.forward() * speed);
+    }
+    if (keypresses[SDL_SCANCODE_GRAVE]) {
+        if(SDL_GetRelativeMouseMode() == SDL_FALSE) {
+            adjusting_mode = true;
+        }
+    }
+
+    if (adjusting_mode) {
+        std::cout << "Input your commands please" << std::endl;
+        std::string command;
+        std::cin >> command;
+        if (command == "regen") {
+            this->generate(static_cast<uint32_t>(time(0)));
+        } else if (command == "frequency") {
+            std::cout << "Initial frequency: " << frequency << std::endl;
+            std::cin >> frequency;
+            std::cout << "New frequency: " << frequency << std::endl;
+        } else if (command == "octaves") {
+            std::cout << "Initial octaves: " << octaves << std::endl;
+            std::cin >> octaves;
+            std::cout << "New octaves: " << octaves << std::endl;
+        } else if (command == "end") {
+            adjusting_mode = false;
+        }
     }
 }
 void World::draw() {
@@ -141,7 +173,6 @@ void World::draw() {
 
     shader.use();
 
-
     for (uint32_t i = 0; i < chunks.size(); ++i) {
         ASSERT_ON_GL_ERROR();
 
@@ -162,19 +193,39 @@ void World::draw() {
     ASSERT_ON_GL_ERROR();
 }
 
-void World::generate() noexcept {
+void World::generate(uint32_t seed) noexcept {
     this->chunks.clear();
 
-    Chunk &chunk = this->chunks.emplace_back();
+    siv::PerlinNoise noise(seed);
 
-    for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-        Chunk::BlockIDType block_id = 0;
-        if (pos.y < 10) {
-            block_id = (pos.y % 4) + 1;
+    const double fx = (Chunk::CHUNK_WIDTH * 5) / frequency;
+    const double fy = (Chunk::CHUNK_WIDTH * 5) / frequency;
+
+    for (uint32_t i = 0; i < 5; ++i)
+        for (uint32_t j = 0; j < 5; ++j) {
+
+        Chunk &chunk = this->chunks.emplace_back();
+
+        for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
+            Chunk::BlockIDType block_id = 0;
+            assert(0 <= pos.x && pos.x < Chunk::CHUNK_WIDTH);
+            assert(0 <= pos.z && pos.z < Chunk::CHUNK_WIDTH);
+
+            double r_noise = noise.accumulatedOctaveNoise2D_0_1((pos.x + (i * Chunk::CHUNK_WIDTH))  / fx, (pos.z + (j * Chunk::CHUNK_WIDTH)) / fy, octaves);
+            const uint8_t height = static_cast<uint8_t>(std::clamp(r_noise * 128, 0.0, 255.0));
+            if (pos.y <= height) {
+                if (pos.y == height) {
+                    block_id = BlockType::Grass;
+                } else if (pos.y + 4 > height) {
+                    block_id = BlockType::Dirt;
+                } else {
+                    block_id = BlockType::Stone;
+                }
+            }
+            chunk.SetBlock(pos, block_id);
         }
-        chunk.SetBlock(pos, block_id);
+        chunk.chunk_pos = glm::ivec2(i, j);
     }
-    chunk.chunk_pos = glm::ivec2(-1, -1);
 }
 
 
@@ -220,13 +271,9 @@ void World::load(const std::string &path) {
 
             pad16();
 
-            std::ofstream b("b.txt");
-            for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos) ;Chunk::loop_through(pos)) {
+            for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
                 chunk.SetBlock(pos, read_binary<Chunk::BlockIDType>(file));
-                b <<  Chunk::world_pos_to_index(pos) << ":(" << pos.x << ", " << pos.y << ", " << pos.z << ")" << "\n";
             }
-            b << std::endl;
-            b.close();
 
             pad16();
         }
