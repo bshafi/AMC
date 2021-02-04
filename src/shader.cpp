@@ -9,6 +9,8 @@ Shader::Shader(const std::string &vertex, const std::string &fragment) {
     ASSERT_ON_GL_ERROR();
     assert(this->shader_program != 0);
 }
+
+
 Shader::~Shader() {
     glDeleteProgram(shader_program);
 }
@@ -117,6 +119,9 @@ int GLFunctionsWrapper::getUniformLocation(int shader_program, const std::string
     ASSERT_ON_GL_ERROR();
 
     return ret;
+}
+void GLFunctionsWrapper::setivec2(int loc, const glm::ivec2 &v) {
+    glUniform2i(loc, v.x, v.y);
 }
 
 void GLFunctionsWrapper::setivec3(int loc, const glm::ivec3 &v) {

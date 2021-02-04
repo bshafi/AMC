@@ -6,10 +6,10 @@
 
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
-#include "chunk.hpp"
 #include "camera.hpp"
-#include "world.hpp"
 #include "gui.hpp"
+#include "world.hpp"
+#include "chunk.hpp"
 
 constexpr int INITIAL_WINDOW_WIDTH = 640;
 constexpr int INITIAL_WINDOW_HEIGHT = 480;
@@ -54,17 +54,16 @@ int main(const int, const char**) {
     });
     GUI save_select_screen;
     save_select_screen.load_images({
-        { "resources/title_image.png", Image{{ -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 }},
+        { "resources/title_image.png",   Image{{  -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 }},
         { "resources/save0.png", Button{ Image{{-0.5, 0.3, 1, 0.5 }, {0, 0, 1, 1}}, 0}},
         { "resources/save1.png", Button{ Image{{-0.5, -0.2, 1, 0.5 }, {0, 0, 1, 1}}, 1}},
         { "resources/save2.png", Button{ Image{{-0.5, -0.7, 1, 0.5 }, {0, 0, 1, 1}}, 2}}
     });
 
-    ASSERT_ON_GL_ERROR();
-
     World world;
 
-    //world.save_world("saves/test.txt");
+    ASSERT_ON_GL_ERROR();
+
 
     uint32_t ticks = SDL_GetTicks();
     bool is_running = true;
@@ -87,13 +86,16 @@ int main(const int, const char**) {
                     break;
                 }
             }
+            case SDL_KEYDOWN:
+                if (event.key.keysym.scancode == SDL_SCANCODE_Q) {
+                    std::cout << world.camera.forward().x << ", " << world.camera.forward().y << ", "  << world.camera.forward().z << std::endl;
+                }
                 break;
             default:
                 if (event.type == WINDOW_TRUE_RESIZE_EVENT) {
                     intptr_t w = reinterpret_cast<intptr_t>(event.user.data1), h = reinterpret_cast<intptr_t>(event.user.data2);
                     glViewport(0, 0, static_cast<int>(w), static_cast<int>(h));
-                }
-                if (event.type == SCENE_CHANGE_EVENT) {
+                }else if (event.type == SCENE_CHANGE_EVENT) {
                     SceneChangeData *scd = static_cast<SceneChangeData*>(event.user.data1);
                     assert(scd);
 
@@ -105,10 +107,9 @@ int main(const int, const char**) {
                         game_state = GameState::SaveSelect;
                         break;
                     case GameState::GamePlay:
-                        // TODO: use world save data
-                        game_state = GameState::GamePlay;
                         assert(scd->save_index.has_value());
-                        world.load_world("saves/save" + std::to_string(scd->save_index.value()) + ".txt");
+                        world.load("saves/save" + std::to_string(scd->save_index.value()) + ".hex");
+                        game_state = GameState::GamePlay;
                         break;
                     default:
                         assert(false);
