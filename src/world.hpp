@@ -16,13 +16,18 @@ struct World {
 
     Camera camera;
     std::string save_name;
+    int32_t octaves;
+    float frequency;
+    bool adjusting_mode;
     
     unsigned int globals_3d_ubo;
 
     static constexpr uint32_t WORLD_VERSION = 1;
 
 
-    void generate() noexcept;
+    static const uint32_t DEFAULT_SEED = 0x33333333;
+
+    void generate(uint32_t seed = DEFAULT_SEED) noexcept;
     void load(const std::string &path);
     void save(const std::string &path) const;
 
