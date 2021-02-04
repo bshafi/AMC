@@ -5,7 +5,7 @@
  - Player can move with WASD keys and look around with mouse controls
 
 # Version 0.0.2 Requirements
- - Better terrain Generation (Hills, valleys, and caves)
+ - Better terrain Generation (Hills, valleys)
  - Player (Movement with WASD controls, jumping with spacebar)
  - Cow (No pathfinding random movement)
  - Zombie (Goes in a line to the player)

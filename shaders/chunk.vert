@@ -4,8 +4,7 @@ layout (location = 0) in vec3 pos;
 layout (location = 1) in vec2 atexCoords;
 layout (location = 2) in uint block_id;
 
-// TODO: Change this to an ivec2 and add a uniform int for a height
-uniform ivec3 chunk_pos;
+uniform ivec2 chunk_pos;
 
 layout (std140) uniform globals_3d {
     mat4x4 view;
@@ -43,11 +42,11 @@ void main() {
     ablock_id = block_id;
 
     int local_y = gl_InstanceID / 256;
-    int local_x = (gl_InstanceID % 256) % 16;
-    int local_z = (gl_InstanceID % 256) / 16;
+    int local_z = (gl_InstanceID % 256) % 16;
+    int local_x = (gl_InstanceID % 256) / 16;
     ivec3 local_coordinates = ivec3(local_x, local_y, local_z);
 
-    vec3 object_pos = 16 * chunk_pos + local_coordinates;
+    vec3 object_pos = 16 * ivec3(chunk_pos.x, 0, chunk_pos.y) + local_coordinates;
     vec3 object_rot = vec3(0.0f, 0.0f, 0.0f); 
 
     texCoords = atexCoords;
