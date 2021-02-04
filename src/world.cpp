@@ -1,10 +1,45 @@
 #include <fstream>
 
 #include "gl_helper.hpp"
+#include "hello_cube.hpp"
 
 #include "world.hpp"
 
-World::World() {
+World::World() : 
+    orientation_texture{ "resources/hello_cube_orientation.png" },
+    blocks_texture{ "resources/blocks.png" }, 
+    shader{ "shaders/chunk.vert", "shaders/chunk.frag" } {
+
+    ASSERT_ON_GL_ERROR();
+
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &cube_vertices_VBO);
+    glGenBuffers(1, &block_ids_VBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, cube_vertices_VBO); ASSERT_ON_GL_ERROR();
+    glBufferData(GL_ARRAY_BUFFER, sizeof(decltype(cube_vertices)::value_type) * cube_vertices.size(), cube_vertices.data(), GL_STATIC_DRAW); ASSERT_ON_GL_ERROR();
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 5, (void*)0); ASSERT_ON_GL_ERROR();
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 5, (void*)(3 * sizeof(float))); ASSERT_ON_GL_ERROR();
+    glEnableVertexAttribArray(1); ASSERT_ON_GL_ERROR();
+
+    glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, nullptr, GL_DYNAMIC_DRAW);
+
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(Chunk::BlockIDType), (void*)0);
+    glVertexAttribDivisor(2, 1);
+    glEnableVertexAttribArray(2);
+
+    ASSERT_ON_GL_ERROR();
+
+    shader.use();
+    shader.bind_texture_to_sampler_2D({
+        { "orientation", orientation_texture },
+        { "blocks", blocks_texture }
+    });
+
     ASSERT_ON_GL_ERROR();
 
     glGenBuffers(1, &globals_3d_ubo);
@@ -15,13 +50,17 @@ World::World() {
     glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f);
     glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
 
-    chunk.shader.bind_UBO("globals_3d", 0);
+    this->shader.bind_UBO("globals_3d", 0);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
     ASSERT_ON_GL_ERROR();
 }
 World::~World() {
+    this->save(save_name);
+
     ASSERT_ON_GL_ERROR();
+
+    glDeleteBuffers(1, &cube_vertices_VBO);
 
     glDeleteBuffers(1, &globals_3d_ubo);
 
@@ -35,16 +74,24 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
         switch (event.type) {
         case SDL_WINDOWEVENT: {
             switch (event.window.type) {
-            case SDL_WINDOWEVENT_RESIZED:
+            case SDL_WINDOWEVENT_RESIZED: {
                 glViewport(0, 0, event.window.data1, event.window.data2);
                 glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
                 glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_DYNAMIC_DRAW);
                 glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(event.window.data1) / event.window.data2, 0.1f, 100.f);
                 glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
             }
+                break;
+            default:
+                break;
+            }
         }
             break;
         default:
+            if (event.type == WINDOW_TRUE_RESIZE_EVENT) {
+                // TODO: Use true window resize instead of window resize event
+                printf("TODO: Need ot implement true resize\n");
+            }
             break;
         }
         if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
@@ -77,8 +124,6 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
 }
 void World::draw() {
     ASSERT_ON_GL_ERROR();
-
-    
      
     glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
     glm::mat4 view = camera.view_matrix();
@@ -87,54 +132,164 @@ void World::draw() {
     
     ASSERT_ON_GL_ERROR();
 
-    chunk.draw();
+
+
+    shader.bind_texture_to_sampler_2D({
+        { "orientation", orientation_texture },
+        { "blocks", blocks_texture }
+    });
+
+    shader.use();
+
+
+    for (uint32_t i = 0; i < chunks.size(); ++i) {
+        ASSERT_ON_GL_ERROR();
+
+        shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunks[i].chunk_pos);
+
+        glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, chunks[i].blocks.data());
+
+        glBindVertexArray(VAO);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
+        
+        ASSERT_ON_GL_ERROR();
+    }
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 
     ASSERT_ON_GL_ERROR();
 }
-void World::load_world(const std::string &file_path) {
-    std::ifstream world_file(file_path);
-    
-    assert(world_file.is_open() && world_file.good());
 
-    int x, y;
-    assert(world_file >> x && world_file >> y);
+void World::generate() noexcept {
+    this->chunks.clear();
 
-    std::array<Chunk::BlockIDType, Chunk::BLOCKS_IN_CHUNK> blocks;
+    Chunk &chunk = this->chunks.emplace_back();
 
-    Chunk::BlockIDType block_id;
-    for (unsigned i = 0; i < Chunk::BLOCKS_IN_CHUNK; ++i) {
-        assert(world_file >> block_id);
-        blocks[i] = block_id;
+    for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
+        Chunk::BlockIDType block_id = 0;
+        if (pos.y < 10) {
+            block_id = (pos.y % 4) + 1;
+        }
+        chunk.SetBlock(pos, block_id);
     }
-
-    this->chunk.load_blocks(blocks);
-    
-
-    // TODO: Implement Chunk position
+    chunk.chunk_pos = glm::ivec2(-1, -1);
 }
-void World::save_world(const std::string &file_path) {
 
-    std::ofstream world_file(file_path);
 
-    assert(world_file.good() && world_file.is_open());
 
-    // FIXME: Implement Chunk position
-    world_file << 0 << " " << 0 << "\n";
-    
-    std::array<Chunk::BlockIDType, Chunk::BLOCKS_IN_CHUNK> blocks;
-    this->chunk.save_blocks(blocks);
+void World::load(const std::string &path) {
+    this->chunks.clear();
+    this->save_name = path;
 
-    for (int i = 0; i < Chunk::BLOCKS_IN_CHUNK; ++i) {
-        if (i % 16 == 0) {
-            world_file << "\n";
+    try {
+        std::ifstream file(path, std::ios_base::binary);
+        file.exceptions(~std::ios_base::goodbit);
+
+        const auto pad16 = [&file]() {
+            while (file.tellg() % 16 != 0) {
+                read_binary<uint8_t>(file);
+            }
+        };
+
+        const uint32_t version = read_binary<uint32_t>(file);
+        assert(version == World::WORLD_VERSION);
+        const uint32_t chunks_count = read_binary<uint32_t>(file);
+
+        this->chunks.reserve(chunks_count);
+        std::vector<uint32_t> chunk_positions;
+        chunk_positions.reserve(chunks_count);
+
+        for (uint32_t i = 0; i < chunks_count; ++i) {
+            chunk_positions.push_back(read_binary<uint32_t>(file));
         }
-        if (i % 256 == 0) {
-            world_file << "\n";
+
+        pad16();
+
+        for (uint32_t i = 0; i < chunks_count; ++i) {
+            Chunk &chunk = this->chunks.emplace_back();
+            file.seekg(chunk_positions[i], std::ios_base::beg);
+
+            const int32_t chunk_pos_x = read_binary<int32_t>(file);
+            const int32_t chunk_pos_y = read_binary<int32_t>(file);
+            chunk.chunk_pos = glm::ivec2(chunk_pos_x, chunk_pos_y);
+
+            const uint64_t blocks_in_chunk = read_binary<uint64_t>(file);
+            assert(blocks_in_chunk == Chunk::BLOCKS_IN_CHUNK);
+
+            pad16();
+
+            std::ofstream b("b.txt");
+            for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos) ;Chunk::loop_through(pos)) {
+                chunk.SetBlock(pos, read_binary<Chunk::BlockIDType>(file));
+                b <<  Chunk::world_pos_to_index(pos) << ":(" << pos.x << ", " << pos.y << ", " << pos.z << ")" << "\n";
+            }
+            b << std::endl;
+            b.close();
+
+            pad16();
         }
 
-        world_file << blocks[i] << " ";
+        file.close();
+    } catch(std::ios_base::failure &error) {
+        std::cout << "File could not open: " << error.what() << std::endl;
+        std::cout << "Generating new world instead" << std::endl;
+
+        return World::generate();
     }
-    world_file << "\n" << std::endl;
+}
+void World::save(const std::string &path) const {
+    try {
+        std::ofstream file(path, std::ios_base::binary);
+        file.exceptions(~std::ios_base::goodbit);
 
-    world_file.close();
+        const auto pad16 = [&file]() {
+            while (file.tellp() % 16 != 0) {
+                write_binary<uint8_t>(file, static_cast<uint8_t>(0));
+            }
+        };
+
+        assert(chunks.size() > 0);
+
+        write_binary<uint32_t>(file, WORLD_VERSION);
+        write_binary<uint32_t>(file, this->chunks.size());
+
+        const uint32_t chunk_pos_start = file.tellp();
+
+        for (uint32_t i = 0; i < this->chunks.size(); ++i) {
+            write_binary<uint32_t>(file, 0xffffffff);
+        }
+
+        pad16();
+
+        for (uint32_t i = 0; i < this->chunks.size(); ++i) {
+            const uint32_t curr_chunk_pos = file.tellp();
+            file.seekp(chunk_pos_start + i * sizeof(uint32_t), std::ios_base::beg);
+            write_binary<uint32_t>(file, curr_chunk_pos);
+            file.seekp(curr_chunk_pos, std::ios_base::beg);
+
+            write_binary<int32_t>(file, chunks[0].chunk_pos.x);
+            write_binary<int32_t>(file, chunks[0].chunk_pos.y);
+            write_binary<uint64_t>(file, Chunk::BLOCKS_IN_CHUNK);
+
+            file.flush();
+
+            pad16();
+
+            file.flush();
+
+            for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos) ;Chunk::loop_through(pos)) {
+                write_binary<Chunk::BlockIDType>(file, this->chunks[i].GetBlock(pos));
+            }
+
+
+            pad16();
+        }
+
+        file.close();
+
+    } catch (std::ios_base::failure &error) {
+        std::cout << "File could not be written to: " << error.what() << std::endl;
+    }
 }
