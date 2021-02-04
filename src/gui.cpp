@@ -54,6 +54,9 @@ GUI::GUI() : shader{ "shaders/gui.vert", "shaders/gui.frag"} {
 
     ASSERT_ON_GL_ERROR();
 
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArray(0);
+
     auto window = SDL_GL_GetCurrentWindow();
     assert(window);
     //SDL_GetWindowSize(window, &window_size.x, &window_size.y);
