@@ -316,8 +316,8 @@ void World::save(const std::string &path) const {
             write_binary<uint32_t>(file, curr_chunk_pos);
             file.seekp(curr_chunk_pos, std::ios_base::beg);
 
-            write_binary<int32_t>(file, chunks[0].chunk_pos.x);
-            write_binary<int32_t>(file, chunks[0].chunk_pos.y);
+            write_binary<int32_t>(file, chunks[i].chunk_pos.x);
+            write_binary<int32_t>(file, chunks[i].chunk_pos.y);
             write_binary<uint64_t>(file, Chunk::BLOCKS_IN_CHUNK);
 
             file.flush();
