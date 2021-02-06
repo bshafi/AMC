@@ -35,7 +35,7 @@ int main(const int, const char**) {
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glClearColor(0.3f, 0.f, 0.f, 1.0f);
 
     int width, height;
@@ -48,21 +48,25 @@ int main(const int, const char**) {
 
     GUI title_screen;
     title_screen.load_images({
-        { "resources/title_image.png", Image{ { -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 }},
-        { "resources/title.png",       Image{ { -.5, .4, 1, .4   }, { 0, 0, 1, 1 }, 1 }},
-        { "resources/play.png", Button{Image{ { -.1, -.9, .2, .1 }, { 0, 0, 1, 1 }, 0 }, 0 }}
+        { "resources/title_image.png",  Image{ { -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 } },
+        { "resources/title.png",        Image{ { -.5, .4, 1, .4   }, { 0, 0, 1, 1 }, 1 } },
+        { "resources/play.png", Button{ Image{ { -.1, -.9, .2, .1 }, { 0, 0, 1, 1 }, 0 }, 0 }}
     });
     GUI save_select_screen;
     save_select_screen.load_images({
-        { "resources/title_image.png",   Image{{  -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 }},
-        { "resources/save0.png", Button{ Image{{-0.5, 0.3, 1, 0.5 }, {0, 0, 1, 1}}, 0}},
-        { "resources/save1.png", Button{ Image{{-0.5, -0.2, 1, 0.5 }, {0, 0, 1, 1}}, 1}},
-        { "resources/save2.png", Button{ Image{{-0.5, -0.7, 1, 0.5 }, {0, 0, 1, 1}}, 2}}
+        { "resources/title_image.png",   Image{ {  -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 } },
+        { "resources/save0.png", Button{ Image{ {-0.5, 0.3, 1, 0.5  }, {0, 0, 1, 1}},  0} },
+        { "resources/save1.png", Button{ Image{ {-0.5, -0.2, 1, 0.5 }, {0, 0, 1, 1}}, 1} },
+        { "resources/save2.png", Button{ Image{ {-0.5, -0.7, 1, 0.5 }, {0, 0, 1, 1}}, 2} }
     });
 
     World world;
 
     ASSERT_ON_GL_ERROR();
+
+    world.camera.pos(glm::vec3{6, 111, 29 });
+    world.camera.pitch(-7.04345);
+    world.camera.yaw(0.43354);
 
 
     uint32_t ticks = SDL_GetTicks();
@@ -88,14 +92,15 @@ int main(const int, const char**) {
             }
             case SDL_KEYDOWN:
                 if (event.key.keysym.scancode == SDL_SCANCODE_Q) {
-                    std::cout << world.camera.forward().x << ", " << world.camera.forward().y << ", "  << world.camera.forward().z << std::endl;
+                    std::cout << world.camera.pos().x << ", " << world.camera.pos().y << ", "  << world.camera.pos().z << std::endl;
+                    std::cout << world.camera.pitch() << ", " << world.camera.yaw() << std::endl;
                 }
                 break;
             default:
                 if (event.type == WINDOW_TRUE_RESIZE_EVENT) {
                     intptr_t w = reinterpret_cast<intptr_t>(event.user.data1), h = reinterpret_cast<intptr_t>(event.user.data2);
                     glViewport(0, 0, static_cast<int>(w), static_cast<int>(h));
-                }else if (event.type == SCENE_CHANGE_EVENT) {
+                } else if (event.type == SCENE_CHANGE_EVENT) {
                     SceneChangeData *scd = static_cast<SceneChangeData*>(event.user.data1);
                     assert(scd);
 

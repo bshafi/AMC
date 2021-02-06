@@ -7,9 +7,11 @@ HunterGate(
     SHA1 "02cdafca02692376d55e549acf85a34445907a43"
 )
 
+set(CMAKE_CXX_COMPILER /usr/local/opt/llvm@11/bin/clang++)
+
 project(Hope)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -glldb -Wall -Werror -fsanitize=address")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -glldb -Wall -Wno-unused-const-variable -Werror -fsanitize=address")
 
 hunter_add_package(msgpack)
 find_package(msgpack CONFIG REQUIRED)

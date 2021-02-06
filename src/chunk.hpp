@@ -35,7 +35,9 @@ struct Chunk {
     // TODO: better name
     // use in a for loop like for(auto pos = glm::ivec3(); loop_through(pos);)
     static void loop_through(glm::ivec3 &pos);
-    static bool is_within_chunk_bounds(glm::ivec3 &pos);
+    static bool is_within_chunk_bounds(const glm::ivec3 &pos);
+
+    bool intersects(glm::vec3 pos, AABB aabb) const;
 
     Chunk();
     ~Chunk();
