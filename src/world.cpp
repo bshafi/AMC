@@ -56,10 +56,6 @@ World::World() :
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
     ASSERT_ON_GL_ERROR();
-
-    frequency = 4.f;
-    octaves = 4;
-    adjusting_mode = false;
 }
 World::~World() {
     this->save(save_name);
@@ -116,42 +112,29 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
 
     const float speed = 1.0f;
 
+    glm::vec3 new_camera_pos = camera.pos();
     const auto keypresses = SDL_GetKeyboardState(NULL);
     if (keypresses[SDL_SCANCODE_A]) {
-        camera.pos(camera.pos() - camera.right() * speed);
+        new_camera_pos = camera.pos() - camera.right() * speed;
     }
     if (keypresses[SDL_SCANCODE_D]) {
-        camera.pos(camera.pos() + camera.right() * speed);
+        new_camera_pos = (camera.pos() + camera.right() * speed);
     }
     if (keypresses[SDL_SCANCODE_S])  {
-        camera.pos(camera.pos() - camera.forward() * speed);
+        new_camera_pos = (camera.pos() - camera.forward() * speed);
     }
     if (keypresses[SDL_SCANCODE_W])  {
-        camera.pos(camera.pos() + camera.forward() * speed);
+        new_camera_pos = (camera.pos() + camera.forward() * speed);
     }
-    if (keypresses[SDL_SCANCODE_GRAVE]) {
-        if(SDL_GetRelativeMouseMode() == SDL_FALSE) {
-            adjusting_mode = true;
+    bool intersects_chunks = false;
+    for (const auto &chunk : this->chunks) {
+        intersects_chunks = chunk.intersects(new_camera_pos, AABB{1, 2, 1});
+        if (intersects_chunks) {
+            break;
         }
     }
-
-    if (adjusting_mode) {
-        std::cout << "Input your commands please" << std::endl;
-        std::string command;
-        std::cin >> command;
-        if (command == "regen") {
-            this->generate(static_cast<uint32_t>(time(0)));
-        } else if (command == "frequency") {
-            std::cout << "Initial frequency: " << frequency << std::endl;
-            std::cin >> frequency;
-            std::cout << "New frequency: " << frequency << std::endl;
-        } else if (command == "octaves") {
-            std::cout << "Initial octaves: " << octaves << std::endl;
-            std::cin >> octaves;
-            std::cout << "New octaves: " << octaves << std::endl;
-        } else if (command == "end") {
-            adjusting_mode = false;
-        }
+    if (!intersects_chunks) {
+        camera.pos(new_camera_pos);
     }
 }
 void World::draw() {
@@ -197,6 +180,9 @@ void World::generate(uint32_t seed) noexcept {
     this->chunks.clear();
 
     siv::PerlinNoise noise(seed);
+
+    const float frequency = 4.f;
+    const int32_t octaves = 4;
 
     const double fx = (Chunk::CHUNK_WIDTH * 5) / frequency;
     const double fy = (Chunk::CHUNK_WIDTH * 5) / frequency;

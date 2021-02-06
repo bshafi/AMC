@@ -16,9 +16,6 @@ struct World {
 
     Camera camera;
     std::string save_name;
-    int32_t octaves;
-    float frequency;
-    bool adjusting_mode;
     
     unsigned int globals_3d_ubo;
 
