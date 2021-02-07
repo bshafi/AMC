@@ -98,7 +98,8 @@ bool Chunk::intersects(glm::vec3 pos, AABB aabb) const {
                 // The object that is being intersected against may have some part of itself
                 // outside the chunk boundaries
                 if (is_within_chunk_bounds(checking_pos)) {
-                    if (this->GetBlock(checking_pos) != BlockType::Air) {
+                    BlockType block_id = static_cast<BlockType>(this->GetBlock(checking_pos));
+                    if (block_id != BlockType::Air) {
                         return true;
                     }
                 }
