@@ -126,15 +126,20 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
     if (keypresses[SDL_SCANCODE_W])  {
         new_camera_pos = (camera.pos() + camera.forward() * speed);
     }
-    bool intersects_chunks = false;
-    for (const auto &chunk : this->chunks) {
-        intersects_chunks = chunk.intersects(new_camera_pos, AABB{1, 2, 1});
-        if (intersects_chunks) {
-            break;
+    
+    
+
+    for (auto component : {glm::vec3(new_camera_pos.x, camera.pos().y, camera.pos().z), glm::vec3(new_camera_pos.x, new_camera_pos.y, camera.pos().z), new_camera_pos}) {
+        bool intersects_chunks = false;
+        for (const auto &chunk : this->chunks) {
+            intersects_chunks = chunk.intersects(component, AABB{1, 2, 1});
+            if (intersects_chunks) {
+                break;
+            }
         }
-    }
-    if (!intersects_chunks) {
-        camera.pos(new_camera_pos);
+        if (!intersects_chunks) {
+            camera.pos(component);
+        }
     }
 }
 void World::draw() {
@@ -326,3 +331,4 @@ void World::save(const std::string &path) const {
         std::cout << "File could not be written to: " << error.what() << std::endl;
     }
 }
+
