@@ -2,23 +2,25 @@
 
 #include "camera.hpp"
 #include "chunk.hpp"
+#include "player.hpp"
 
 struct World {
     std::vector<Chunk> chunks;
+    Player player;
 
     Texture orientation_texture;
     Texture blocks_texture;
     Shader shader;
 
+    glm::vec3 try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const;
+    bool intersects_block(const glm::vec3 &pos, const AABB &aabb) const;
+
     unsigned int cube_vertices_VBO;
     unsigned int VAO;
     unsigned int block_ids_VBO;
 
-    Camera camera;
+
     std::string save_name;
-    int32_t octaves;
-    float frequency;
-    bool adjusting_mode;
     
     unsigned int globals_3d_ubo;
 

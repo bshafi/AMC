@@ -46,3 +46,16 @@ std::ostream& write_binary(std::ostream &os, const T &val) {
     T val_copy = local_endian_to_big_endian(val);
     return os.write(reinterpret_cast<char*>(&val_copy), sizeof(T));
 }
+
+struct AABB {
+    // width: x
+    // height: y
+    // length: z
+    float width, height, length;
+
+    AABB(float = 0, float = 0, float = 0);
+};
+
+// expects that pos is in the bottom back left corner
+bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1);
+
