@@ -84,7 +84,7 @@ bool Chunk::intersects(glm::vec3 pos, AABB aabb) const {
     }
 
     glm::ivec3 bottom_left_back = floor(pos - chunk_pos_fvec3);
-    glm::ivec3 top_right_front = ceil(pos + glm::vec3(aabb.width, aabb.length, aabb.height) - chunk_pos_fvec3);
+    glm::ivec3 top_right_front = floor(pos + glm::vec3(aabb.width, aabb.length, aabb.height) - chunk_pos_fvec3);
 
     assert(bottom_left_back.x <= top_right_front.x);
     assert(bottom_left_back.y <= top_right_front.y);
@@ -92,14 +92,13 @@ bool Chunk::intersects(glm::vec3 pos, AABB aabb) const {
 
     for (int i = bottom_left_back.x; i <= top_right_front.x; ++i)
         for (int j = bottom_left_back.y; j <= top_right_front.y; ++j)
-            for (int k = bottom_left_back.z; k <= top_right_front.z; ++k) {
+            for (int k = bottom_left_back.z; k < top_right_front.z; ++k) {  /* Using < instead of <= for k seems to fix the invisible boundary blocks in the z axis */
                 glm::ivec3 checking_pos = glm::ivec3(i, j, k);
             
                 // The object that is being intersected against may have some part of itself
                 // outside the chunk boundaries
                 if (is_within_chunk_bounds(checking_pos)) {
-                    BlockType block_id = static_cast<BlockType>(this->GetBlock(checking_pos));
-                    if (block_id != BlockType::Air) {
+                    if (this->GetBlock(checking_pos) != BlockType::Air) {
                         return true;
                     }
                 }

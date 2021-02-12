@@ -45,3 +45,4 @@ CMakeCache.txt
 
 # Save Backups
 backup/*
+local/*

@@ -47,7 +47,7 @@ World::World() :
     glGenBuffers(1, &globals_3d_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
-    glm::mat4 view = camera.view_matrix();
+    glm::mat4 view = player.camera.view_matrix();
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
     glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f);
     glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
@@ -102,51 +102,72 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
         if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
             SDL_SetRelativeMouseMode(SDL_FALSE);
         }
+        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+            player.jump(*this);
+        }
         if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
-            camera.rotate_right(M_PI * event.motion.xrel / 1000.0f);
-            camera.rotate_upwards(-M_PI * event.motion.yrel / 1000.0f);
+            player.look_right(M_PI * event.motion.xrel / 1000.0f, *this);
+            player.look_up(-M_PI * event.motion.yrel / 1000.0f, *this);
+            //camera.rotate_right(M_PI * event.motion.xrel / 1000.0f);
+            //camera.rotate_upwards(-M_PI * event.motion.yrel / 1000.0f);
         }
 
         ASSERT_ON_GL_ERROR();
     }
 
-    const float speed = 1.0f;
+    const float speed = 0.4f;
 
-    glm::vec3 new_camera_pos = camera.pos();
+    //glm::vec3 delta_pos = glm::vec3();
     const auto keypresses = SDL_GetKeyboardState(NULL);
     if (keypresses[SDL_SCANCODE_A]) {
-        new_camera_pos = camera.pos() - camera.right() * speed;
+        player.move_right(-speed, *this);
+        //delta_pos += -camera.right() * speed;
     }
     if (keypresses[SDL_SCANCODE_D]) {
-        new_camera_pos = (camera.pos() + camera.right() * speed);
+        player.move_right(speed, *this);
+        //delta_pos += (camera.right() * speed);
     }
     if (keypresses[SDL_SCANCODE_S])  {
-        new_camera_pos = (camera.pos() - camera.forward() * speed);
+        player.move_forward(-speed, *this);
+        //delta_pos += (-camera.forward() * speed);
     }
     if (keypresses[SDL_SCANCODE_W])  {
-        new_camera_pos = (camera.pos() + camera.forward() * speed);
+        player.move_forward(speed, *this);
+        //delta_pos += (camera.forward() * speed);
     }
-    
-    
+    if (keypresses[SDL_SCANCODE_F3]) {
+        player.toggle_debug_mode(*this);
+    }
+    player.apply_gravity(0.25f, *this);
 
-    for (auto component : {glm::vec3(new_camera_pos.x, camera.pos().y, camera.pos().z), glm::vec3(new_camera_pos.x, new_camera_pos.y, camera.pos().z), new_camera_pos}) {
-        bool intersects_chunks = false;
-        for (const auto &chunk : this->chunks) {
-            intersects_chunks = chunk.intersects(component, AABB{1, 2, 1});
-            if (intersects_chunks) {
-                break;
-            }
-        }
-        if (!intersects_chunks) {
-            camera.pos(component);
+    //camera.pos(this->try_move_to(camera.pos(), delta_pos, AABB(1.f, 2.f, 1.f)));
+}
+
+bool World::intersects_block(const glm::vec3 &pos, const AABB &aabb) const {
+    for (const auto &chunk : this->chunks) {
+        if (chunk.intersects(pos, aabb)) {
+            return true;
         }
     }
+    return false;
 }
+
+glm::vec3 World::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const {
+    glm::vec3 new_pos = pos;
+    glm::vec3 components[] = { glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1) };
+    for (int i = 0; i < 3; ++i) {
+        if (!this->intersects_block(pos + delta_pos * components[i], AABB(1.f, 2.f, 1.f))) {
+            new_pos += delta_pos * components[i];
+        }
+    }
+    return new_pos;
+}
+
 void World::draw() {
     ASSERT_ON_GL_ERROR();
      
     glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glm::mat4 view = camera.view_matrix();
+    glm::mat4 view = player.camera.view_matrix();
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     

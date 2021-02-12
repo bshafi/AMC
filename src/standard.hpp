@@ -52,6 +52,8 @@ struct AABB {
     // height: y
     // length: z
     float width, height, length;
+
+    AABB(float = 0, float = 0, float = 0);
 };
 
 // expects that pos is in the bottom back left corner
