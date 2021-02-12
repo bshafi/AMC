@@ -69,3 +69,21 @@
 #else
 #error "SDL_BYTEORDER not defined"
 #endif
+
+
+bool ranges_overlap(float x0, float x0_offset, float x1, float x1_offset) {
+    return (x0 <= x1 && x1 <= x0 + x0_offset) || (x0 <= x1 + x1_offset && x1 + x1_offset <= x0 + x0_offset);
+}
+
+
+AABB::AABB(float w, float h, float l) {
+    width = w;
+    height = h;
+    length = l;
+}
+
+bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1) {
+    return ranges_overlap(pos0.x,  aabb0.width, pos1.x, aabb1.width) &&
+           ranges_overlap(pos0.y, aabb0.height, pos1.y, aabb1.height) &&
+           ranges_overlap(pos0.z, aabb0.length, pos1.z, aabb1.length);
+}
