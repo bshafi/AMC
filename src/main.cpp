@@ -16,6 +16,8 @@ constexpr int INITIAL_WINDOW_HEIGHT = 480;
 constexpr uint32_t DEFAULT_SDL_WINDOW_FLAGS = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
 constexpr uint32_t FPS = 30;
 
+// TODO: VERY IMPORTANT zero all glm vectors their default constructors don't zero themselves
+
 int main(const int, const char**) {
     Init_SDL_and_GL();
 
@@ -36,7 +38,7 @@ int main(const int, const char**) {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glClearColor(0.3f, 0.f, 0.f, 1.0f);
+    glClearColor(135 / 255.f,206 / 255.f,235 / 255.f, 1.0f);
 
     int width, height;
     SDL_GL_GetDrawableSize(window, &width, &height);
@@ -64,9 +66,9 @@ int main(const int, const char**) {
 
     ASSERT_ON_GL_ERROR();
 
-    world.camera.pos(glm::vec3{6, 111, 29 });
-    world.camera.pitch(-7.04345);
-    world.camera.yaw(0.43354);
+    world.player.set_position(glm::vec3{ 6.f, 111.f, 29.f });
+    world.player.camera.pitch(-7.04345);
+    world.player.camera.yaw(0.43354);
 
 
     uint32_t ticks = SDL_GetTicks();
@@ -92,8 +94,9 @@ int main(const int, const char**) {
             }
             case SDL_KEYDOWN:
                 if (event.key.keysym.scancode == SDL_SCANCODE_Q) {
-                    std::cout << world.camera.pos().x << ", " << world.camera.pos().y << ", "  << world.camera.pos().z << std::endl;
-                    std::cout << world.camera.pitch() << ", " << world.camera.yaw() << std::endl;
+                    std::cout << "pos: " << world.player.camera.pos().x << ", " << world.player.camera.pos().y << ", "  << world.player.camera.pos().z << std::endl;
+                    std::cout << "rot: " << world.player.camera.pitch() << ", " << world.player.camera.yaw() << std::endl;
+                    std::cout << "vel: " << world.player.velocity.x << " " << world.player.velocity.y << " " << world.player.velocity.z << std::endl;
                 }
                 break;
             default:
