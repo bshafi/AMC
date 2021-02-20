@@ -140,7 +140,7 @@ uint32_t LoadImage(const std::string &imagePath) {
     assert(original);
 
     SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
-    //SDL_BlitSurface(original, nullptr, other, nullptr);
+    // Flips texture so that OpenGl renders it properly
     for (int i = 0; i < original->h; ++i) {
         SDL_Rect source = { 0, i, original->w, 1 };
         SDL_Rect dest = { 0, original->h - 1 - i, modified->w, 1 };
@@ -171,7 +171,7 @@ uint32_t RasterizeText(const std::string &text) {
     assert(original);
 
     SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
-    //SDL_BlitSurface(original, nullptr, other, nullptr);
+    // Flips texture so that OpenGl renders it properly
     for (int i = 0; i < original->h; ++i) {
         SDL_Rect source = { 0, i, original->w, 1 };
         SDL_Rect dest = { 0, original->h - 1 - i, modified->w, 1 };

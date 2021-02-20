@@ -108,8 +108,6 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
         if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
             player.look_right(M_PI * event.motion.xrel / 1000.0f, *this);
             player.look_up(-M_PI * event.motion.yrel / 1000.0f, *this);
-            //camera.rotate_right(M_PI * event.motion.xrel / 1000.0f);
-            //camera.rotate_upwards(-M_PI * event.motion.yrel / 1000.0f);
         }
 
         ASSERT_ON_GL_ERROR();
@@ -117,30 +115,23 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
 
     const float speed = 0.4f;
 
-    //glm::vec3 delta_pos = glm::vec3();
     const auto keypresses = SDL_GetKeyboardState(NULL);
     if (keypresses[SDL_SCANCODE_A]) {
         player.move_right(-speed, *this);
-        //delta_pos += -camera.right() * speed;
     }
     if (keypresses[SDL_SCANCODE_D]) {
         player.move_right(speed, *this);
-        //delta_pos += (camera.right() * speed);
     }
     if (keypresses[SDL_SCANCODE_S])  {
         player.move_forward(-speed, *this);
-        //delta_pos += (-camera.forward() * speed);
     }
     if (keypresses[SDL_SCANCODE_W])  {
         player.move_forward(speed, *this);
-        //delta_pos += (camera.forward() * speed);
     }
     if (keypresses[SDL_SCANCODE_F3]) {
         player.toggle_debug_mode(*this);
     }
-    player.apply_gravity(0.25f, *this);
-
-    //camera.pos(this->try_move_to(camera.pos(), delta_pos, AABB(1.f, 2.f, 1.f)));
+    player.apply_gravity(*this);
 }
 
 bool World::intersects_block(const glm::vec3 &pos, const AABB &aabb) const {
