@@ -6,7 +6,7 @@
 #include "camera.hpp"
 
 
-glm::vec3 Camera::UP = glm::vec3(0, 1, 0);
+const glm::vec3 Camera::UP = glm::vec3(0, 1, 0);
 
 Camera::Camera(glm::vec3 camera_pos) : camera_pos{camera_pos}, _yaw{-M_PI_2}, _pitch{0.0f} {
 

@@ -27,5 +27,5 @@ private:
     // Note: pitch is up and down while yaw is left and right
     float _yaw, _pitch;
 
-    static glm::vec3 UP;
+    static const glm::vec3 UP;
 };
