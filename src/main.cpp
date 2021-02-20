@@ -16,7 +16,6 @@ constexpr int INITIAL_WINDOW_HEIGHT = 480;
 constexpr uint32_t DEFAULT_SDL_WINDOW_FLAGS = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
 constexpr uint32_t FPS = 30;
 
-// TODO: VERY IMPORTANT zero all glm vectors their default constructors don't zero themselves
 
 int main(const int, const char**) {
     Init_SDL_and_GL();
@@ -30,6 +29,7 @@ int main(const int, const char**) {
         DEFAULT_SDL_WINDOW_FLAGS
     );
     assert(window);
+    
     SDL_GLContext sdl_glcontext = SDL_GL_CreateContext(window);
     assert(sdl_glcontext);
 

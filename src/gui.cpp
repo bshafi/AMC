@@ -59,7 +59,6 @@ GUI::GUI() : shader{ "shaders/gui.vert", "shaders/gui.frag"} {
 
     auto window = SDL_GL_GetCurrentWindow();
     assert(window);
-    //SDL_GetWindowSize(window, &window_size.x, &window_size.y);
     SDL_GL_GetDrawableSize(window, &window_size.x, &window_size.y);
 }
 GUI::~GUI() {
