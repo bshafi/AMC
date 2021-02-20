@@ -39,7 +39,7 @@ bool Chunk::is_within_chunk_bounds(const glm::ivec3 &pos) {
     (MIN_Z <= pos.z && pos.z <= MAX_Z);
 }
 
-// the result of the modulo operator can be undefined on negative numbers this operations preserves
+// the result of the modulo operator can be undefined on negative numbers this operations preserves the mathematical definition of modulo
 // -16 | ... | -2 | -1 | 0 | 1 | 2
 //+  0 | ... | 14 | 15 | 0 | 1 | 2
 uint32_t mod16(int32_t x) {
@@ -92,13 +92,14 @@ bool Chunk::intersects(glm::vec3 pos, AABB aabb) const {
 
     for (int i = bottom_left_back.x; i <= top_right_front.x; ++i)
         for (int j = bottom_left_back.y; j <= top_right_front.y; ++j)
-            for (int k = bottom_left_back.z; k < top_right_front.z; ++k) {  /* Using < instead of <= for k seems to fix the invisible boundary blocks in the z axis */
-                glm::ivec3 checking_pos = glm::ivec3(i, j, k);
+            for (int k = bottom_left_back.z; k <= top_right_front.z; ++k) {
+                const glm::ivec3 checking_pos = glm::ivec3(i, j, k);
+                const glm::vec3 block_pos_world_coords = glm::vec3(checking_pos) + chunk_pos_fvec3;
             
                 // The object that is being intersected against may have some part of itself
                 // outside the chunk boundaries
                 if (is_within_chunk_bounds(checking_pos)) {
-                    if (this->GetBlock(checking_pos) != BlockType::Air) {
+                    if (this->GetBlock(checking_pos) != BlockType::Air && AABBIntersection(block_pos_world_coords, AABB{ 1, 1, 1}, pos, aabb)) {
                         return true;
                     }
                 }

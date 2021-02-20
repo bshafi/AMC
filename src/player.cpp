@@ -14,12 +14,12 @@ void Player::set_position(const glm::vec3 &pos) {
 }
 
 // FIXME: The y velocity is nonzero when the player is not falling
-void Player::apply_gravity(float f, World &w) {
+void Player::apply_gravity(World &w) {
     if (!debug_mode) {
         auto position_copy = this->position;
         auto velocity_copy = this->velocity;
 
-        this->velocity = velocity_copy + glm::vec3(0, -f, 0);
+        this->velocity = velocity_copy + glm::vec3(0, -gravity, 0);
         set_position(w.try_move_to(position_copy, velocity_copy, this->aabb));
         
         // uses this->velocity instead of velocity_copy because the 
