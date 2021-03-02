@@ -49,7 +49,7 @@ hunter_add_package(glm)
 find_package(glm REQUIRED)
 list(APPEND TEMP_LIBRARIES glm)
 
-add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp src/gui.cpp src/standard.cpp src/world.cpp src/chunk.cpp src/player.cpp)
+add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp src/standard.cpp src/world.cpp src/chunk.cpp src/player.cpp src/inventory.cpp src/gui.cpp)
 target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
 
 string(TIMESTAMP CURRENT_DATE_TIME "%Y_%m_%d_%H_%M_%S")

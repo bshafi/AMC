@@ -47,6 +47,13 @@ std::ostream& write_binary(std::ostream &os, const T &val) {
     return os.write(reinterpret_cast<char*>(&val_copy), sizeof(T));
 }
 
+struct frect {
+    float x, y, w, h;
+
+    explicit operator glm::vec4() const;
+};
+frect vec4_to_frect(const glm::vec4 &);
+
 struct AABB {
     // width: x
     // height: y
@@ -59,3 +66,34 @@ struct AABB {
 // expects that pos is in the bottom back left corner
 bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1);
 
+
+struct Handle {
+public:
+    bool operator<(const Handle &lhs) const {
+        return h_id < lhs.h_id;
+    }
+    bool operator<=(const Handle &lhs) const {
+        return h_id <= lhs.h_id;
+    }
+    bool operator>(const Handle &lhs) const {
+        return h_id > lhs.h_id;
+    }
+    bool operator>=(const Handle &lhs) const {
+        return h_id >= lhs.h_id;
+    }
+    bool operator==(const Handle &lhs) const {
+        return h_id == lhs.h_id;
+    }
+    bool operator!=(const Handle &lhs) const {
+        return h_id != lhs.h_id;
+    }
+    uint32_t id() const {
+        return h_id;
+    }
+protected:
+    Handle(uint32_t id) {
+        this->h_id = id;
+    }
+private:
+    uint32_t h_id;
+};

@@ -3,12 +3,16 @@
 #include "camera.hpp"
 #include "chunk.hpp"
 #include "player.hpp"
+#include "inventory.hpp"
 
 struct World {
     std::vector<Chunk> chunks;
+
     Player player;
+    Inventory inventory;
 
     Texture orientation_texture;
+
     Texture blocks_texture;
     Shader shader;
 

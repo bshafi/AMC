@@ -87,3 +87,11 @@ bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1) {
            ranges_overlap(pos0.y, aabb0.height, pos1.y, aabb1.height) &&
            ranges_overlap(pos0.z, aabb0.length, pos1.z, aabb1.length);
 }
+
+frect vec4_to_frect(const glm::vec4 &v) {
+    return frect{ v.x, v.y, v.z, v.w };
+}
+
+frect::operator glm::vec4() const {
+    return glm::vec4(x, y, w, h);
+}

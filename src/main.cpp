@@ -7,15 +7,14 @@
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
 #include "camera.hpp"
-#include "gui.hpp"
 #include "world.hpp"
 #include "chunk.hpp"
+#include "gui.hpp"
 
-constexpr int INITIAL_WINDOW_WIDTH = 640;
+constexpr int INITIAL_WINDOW_WIDTH = 853;
 constexpr int INITIAL_WINDOW_HEIGHT = 480;
 constexpr uint32_t DEFAULT_SDL_WINDOW_FLAGS = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
 constexpr uint32_t FPS = 30;
-
 
 int main(const int, const char**) {
     Init_SDL_and_GL();
@@ -38,43 +37,44 @@ int main(const int, const char**) {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glClearColor(135 / 255.f,206 / 255.f,235 / 255.f, 1.0f);
+    glClearColor(135 / 255.f, 206 / 255.f,235 / 255.f, 1.0f);
 
     int width, height;
     SDL_GL_GetDrawableSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
-    GameState game_state = GameState::TitleScreen;
+    Renderer renderer;
 
     ASSERT_ON_GL_ERROR();
 
-    GUI title_screen;
-    title_screen.load_images({
-        { "resources/title_image.png",  Image{ { -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 } },
-        { "resources/title.png",        Image{ { -.5, .4, 1, .4   }, { 0, 0, 1, 1 }, 1 } },
-        { "resources/play.png", Button{ Image{ { -.1, -.9, .2, .1 }, { 0, 0, 1, 1 }, 0 }, 0 }}
-    });
-    GUI save_select_screen;
-    save_select_screen.load_images({
-        { "resources/title_image.png",   Image{ {  -1, -1, 2, 2     }, { 0, 0, 1, 1 }, 2 } },
-        { "resources/save0.png", Button{ Image{ {-0.5, 0.3, 1, 0.5  }, {0, 0, 1, 1}},  0} },
-        { "resources/save1.png", Button{ Image{ {-0.5, -0.2, 1, 0.5 }, {0, 0, 1, 1}}, 1} },
-        { "resources/save2.png", Button{ Image{ {-0.5, -0.7, 1, 0.5 }, {0, 0, 1, 1}}, 2} }
-    });
-
-    World world;
+    GUI gui;
+    {
+        auto *title_background = new Texture("resources/title_image.png");
+        auto *title_text = new Texture("resources/title.png");
+        auto *play_button = new Texture("resources/play_button.png");
+        
+        auto *title_text_sprite = new GUIElement(Sprite{ title_text });
+        const auto play_button_rect = frect{ 0, 0, static_cast<float>(play_button->width()), static_cast<float>(play_button->height()) };
+        const auto play_button_normal = frect{ 0, 0, play_button_rect.w, play_button_rect.h / 2 };
+        const auto play_button_hover = frect{ 0, play_button_rect.h / 2, play_button_rect.w, play_button_rect.h / 2 };
+        auto *play_button_sprite = new GUIElement(Button{ play_button, play_button_normal, play_button_hover });
+        auto *title_background_sprite = new GUIElement(Sprite{ title_background, true });
+        //auto *sprite = new GUIElement(HBisection{ sprite1, new GUIElement(VBisection{ nullptr, new GUIElement(VBisection{ sprite2, nullptr, 8.f/9.f }), 0.1f }) });
+        auto *things = new GUIElement(HBisection{ GUI::VPadding(title_text_sprite, 0.3f), GUI::VPadding(play_button_sprite, 2/10.f) });
+        auto *root = new GUIElement(std::vector<GUIElement*>{ title_background_sprite, things });
+        //auto *sprite = GUI::HPadding(sprite1, 0.1f);
+        std::vector<Texture*> texs = { title_text, play_button, title_background };
+        gui.set_textures(texs);
+        gui.set_root(&root);
+    }
 
     ASSERT_ON_GL_ERROR();
-
-    world.player.set_position(glm::vec3{ 6.f, 111.f, 29.f });
-    world.player.camera.pitch(-7.04345);
-    world.player.camera.yaw(0.43354);
-
 
     uint32_t ticks = SDL_GetTicks();
     bool is_running = true;
     std::vector<SDL_Event> events;
     while (is_running) {
+
         events.clear();
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
             switch (event.type) {
@@ -94,9 +94,7 @@ int main(const int, const char**) {
             }
             case SDL_KEYDOWN:
                 if (event.key.keysym.scancode == SDL_SCANCODE_Q) {
-                    std::cout << "pos: " << world.player.camera.pos().x << ", " << world.player.camera.pos().y << ", "  << world.player.camera.pos().z << std::endl;
-                    std::cout << "rot: " << world.player.camera.pitch() << ", " << world.player.camera.yaw() << std::endl;
-                    std::cout << "vel: " << world.player.velocity.x << " " << world.player.velocity.y << " " << world.player.velocity.z << std::endl;
+                    
                 }
                 break;
             default:
@@ -107,65 +105,20 @@ int main(const int, const char**) {
                     SceneChangeData *scd = static_cast<SceneChangeData*>(event.user.data1);
                     assert(scd);
 
-                    switch (scd->next_game_state) {
-                    case GameState::TitleScreen:
-                        game_state = GameState::TitleScreen;
-                        break;
-                    case GameState::SaveSelect:
-                        game_state = GameState::SaveSelect;
-                        break;
-                    case GameState::GamePlay:
-                        assert(scd->save_index.has_value());
-                        world.load("saves/save" + std::to_string(scd->save_index.value()) + ".hex");
-                        game_state = GameState::GamePlay;
-                        break;
-                    default:
-                        assert(false);
-                    }
-
                     delete scd;
                 }
             break;
             }
             events.push_back(event);
         }
+        gui.handle_events(events);
 
-        switch (game_state) {
-        case GameState::TitleScreen:
-            title_screen.handle_events(events);
-            if (title_screen.is_clicked(0)) {
-                game_state = GameState::SaveSelect;
-            }
-            break;
-        case GameState::GamePlay:
-            world.handle_events(events);
-            break;
-        case GameState::SaveSelect:
-            save_select_screen.handle_events(events);
-            for (int i = 0; i < 3; ++i) {
-                if (save_select_screen.is_clicked(i)) {
-                    PushSceneChangeEvent(SceneChangeData{ GameState::GamePlay, i });
-                }
-            }
-            break;
-        }
         ASSERT_ON_GL_ERROR();
 
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-
-        switch (game_state) {
-        case GameState::TitleScreen:
-            title_screen.draw();
-            break;
-        case GameState::GamePlay:
-            world.draw();
-            break;
-        case GameState::SaveSelect:
-            save_select_screen.draw();
-            break;
-        }
+        gui.draw(renderer);
 
         SDL_GL_SwapWindow(window);
 
@@ -174,6 +127,7 @@ int main(const int, const char**) {
             SDL_Delay(1000 / FPS - delta_ticks);
         }
         ticks = SDL_GetTicks();
+
     }
 
     SDL_GL_DeleteContext(sdl_glcontext);
