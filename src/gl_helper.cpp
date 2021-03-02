@@ -57,11 +57,6 @@ void PushWindowTrueResizeEvent(int width, int height) {
     }
 }
 
-glm::uvec2 GetWindowBoundsFromTrueResizeEvent(const SDL_Event &event) {
-    assert(event.type == WINDOW_TRUE_RESIZE_EVENT);
-
-    return glm::uvec2(reinterpret_cast<uintptr_t>(event.user.data1), reinterpret_cast<uintptr_t>(event.user.data2));
-}
 void PushSceneChangeEvent(const SceneChangeData &_scene_change_data) {
     auto *scene_change_data = new SceneChangeData(_scene_change_data);
 
@@ -140,14 +135,16 @@ unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::s
     return shaderProgram;
 }
 
-uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *height) {
-    SDL_Surface *modified = IMG_Load(imagePath.c_str());
+uint32_t LoadImage(const std::string &imagePath) {
+    SDL_Surface *original = IMG_Load(imagePath.c_str());
+    assert(original);
 
-    if (width != nullptr) {
-        *width = modified->w;
-    }
-    if (height != nullptr) {
-        *height = modified->h;
+    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
+    // Flips texture so that OpenGl renders it properly
+    for (int i = 0; i < original->h; ++i) {
+        SDL_Rect source = { 0, i, original->w, 1 };
+        SDL_Rect dest = { 0, original->h - 1 - i, modified->w, 1 };
+        SDL_BlitSurface(original, &source, modified, &dest);
     }
 
     unsigned int texture;
@@ -162,6 +159,7 @@ uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *heig
     glGenerateMipmap(GL_TEXTURE_2D);
 
     SDL_FreeSurface(modified);
+    SDL_FreeSurface(original);
 
     return texture;
 }
@@ -169,7 +167,16 @@ uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *heig
 uint32_t RasterizeText(const std::string &text) {
     assert(default_font);
 
-    SDL_Surface *modified = TTF_RenderText_Blended(default_font, text.c_str(), WHITE);
+    SDL_Surface *original = TTF_RenderText_Blended(default_font, text.c_str(), WHITE);
+    assert(original);
+
+    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
+    // Flips texture so that OpenGl renders it properly
+    for (int i = 0; i < original->h; ++i) {
+        SDL_Rect source = { 0, i, original->w, 1 };
+        SDL_Rect dest = { 0, original->h - 1 - i, modified->w, 1 };
+        SDL_BlitSurface(original, &source, modified, &dest);
+    }
 
     unsigned int texture;
     glGenTextures(1, &texture);
@@ -183,6 +190,7 @@ uint32_t RasterizeText(const std::string &text) {
     glGenerateMipmap(GL_TEXTURE_2D);
 
     SDL_FreeSurface(modified);
+    SDL_FreeSurface(original);
 
     return texture;
 }
@@ -205,13 +213,7 @@ bool glBreakOnError() {
 
     return true;
 }
-glm::uvec2 GetTrueWindowSize() {
-    int w, h;
 
-    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &w, &h);
-
-    return glm::uvec2(w, h);
-}
 
 // Assume that the gl types are the same as the cpp types
 static_assert(std::is_same<uint32_t, GLuint>::value);

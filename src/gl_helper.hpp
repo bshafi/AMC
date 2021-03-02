@@ -23,7 +23,6 @@ bool glBreakOnError();
     #define ASSERT_ON_GL_ERROR() do {} while (false)
 #endif
 
-union SDL_Event;
 
 // do not modify
 // the event handle that gives the real window size event.user.data1xevent.user.data2
@@ -48,12 +47,9 @@ struct SceneChangeData {
 
 void PushWindowTrueResizeEvent(int witdth, int height);
 
-glm::uvec2 GetWindowBoundsFromTrueResizeEvent(const SDL_Event &event);
-glm::uvec2 GetTrueWindowSize();
-
 // user.event.data1 is a SceneChangeData pointer which must only be freed by the main thread
 void PushSceneChangeEvent(const SceneChangeData &);
 
 unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::string &fragmentShaderPath);
-uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *height);
+uint32_t LoadImage(const std::string &imagePath);
 uint32_t RasterizeText(const std::string &text);

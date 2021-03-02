@@ -24,5 +24,5 @@ struct Player {
     void jump(World&);
     void toggle_debug_mode(World&);
 
-    static constexpr float gravity = 9.8f;
+    static const float gravity = 9.8f;
 };

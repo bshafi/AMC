@@ -96,26 +96,18 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
             }
             break;
         }
-        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_E) {
-            inventory.toggle();
-            SDL_SetRelativeMouseMode(!inventory.is_open() ? SDL_TRUE : SDL_FALSE);
+        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+            SDL_SetRelativeMouseMode(SDL_TRUE);
         }
-        if (inventory.is_open()) {
-
-        } else {
-            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-                SDL_SetRelativeMouseMode(SDL_TRUE);
-            }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
-                SDL_SetRelativeMouseMode(SDL_FALSE);
-            }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
-                player.jump(*this);
-            }
-            if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
-                player.look_right(M_PI * event.motion.xrel / 1000.0f, *this);
-                player.look_up(-M_PI * event.motion.yrel / 1000.0f, *this);
-            }
+        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+            SDL_SetRelativeMouseMode(SDL_FALSE);
+        }
+        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+            player.jump(*this);
+        }
+        if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
+            player.look_right(M_PI * event.motion.xrel / 1000.0f, *this);
+            player.look_up(-M_PI * event.motion.yrel / 1000.0f, *this);
         }
 
         ASSERT_ON_GL_ERROR();
@@ -123,23 +115,21 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
 
     const float speed = 0.4f;
 
-    if (!inventory.is_open()) {
-        const auto keypresses = SDL_GetKeyboardState(NULL);
-        if (keypresses[SDL_SCANCODE_A]) {
-            player.move_right(-speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_D]) {
-            player.move_right(speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_S])  {
-            player.move_forward(-speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_W])  {
-            player.move_forward(speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_F3]) {
-            player.toggle_debug_mode(*this);
-        }
+    const auto keypresses = SDL_GetKeyboardState(NULL);
+    if (keypresses[SDL_SCANCODE_A]) {
+        player.move_right(-speed, *this);
+    }
+    if (keypresses[SDL_SCANCODE_D]) {
+        player.move_right(speed, *this);
+    }
+    if (keypresses[SDL_SCANCODE_S])  {
+        player.move_forward(-speed, *this);
+    }
+    if (keypresses[SDL_SCANCODE_W])  {
+        player.move_forward(speed, *this);
+    }
+    if (keypresses[SDL_SCANCODE_F3]) {
+        player.toggle_debug_mode(*this);
     }
     player.apply_gravity(*this);
 }
@@ -174,6 +164,8 @@ void World::draw() {
     
     ASSERT_ON_GL_ERROR();
 
+
+
     shader.bind_texture_to_sampler_2D({
         { "orientation", orientation_texture },
         { "blocks", blocks_texture }
@@ -194,8 +186,6 @@ void World::draw() {
         
         ASSERT_ON_GL_ERROR();
     }
-
-    inventory.draw();
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);

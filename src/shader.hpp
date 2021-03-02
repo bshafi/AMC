@@ -15,7 +15,6 @@ namespace GLFunctionsWrapper {
     void setFloat(int loc, const float &flt);
     void setvec3(int loc, const glm::vec3 &);
     void setvec2(int loc, const glm::vec2 &);
-    void setvec4(int loc, const glm::vec4 &);
     void setuvec2(int loc, const glm::uvec2 &);
     void setivec2(int loc, const glm::ivec2 &);
     void setivec3(int loc, const glm::ivec3 &);
@@ -28,7 +27,7 @@ namespace GLFunctionsWrapper {
     struct shader_is_implemented {
         static const bool value = std::is_same<T, float>::value || std::is_same<T, glm::vec3>::value || std::is_same<T, glm::vec2>::value ||
                             std::is_same<T, glm::uvec2>::value || std::is_same<T, glm::ivec3>::value || std::is_same<T, glm::mat4x4>::value ||
-                            std::is_same<T, uint32_t>::value || std::is_same<T, glm::ivec2>::value || std::is_same<T, glm::vec4>::value;
+                            std::is_same<T, uint32_t>::value || std::is_same<T, glm::ivec2>::value;
     };
 
 };
@@ -68,9 +67,8 @@ public:
     Shader();
     ~Shader();
 
-    Shader& operator=(Shader rhs);
-    Shader(Shader &&shader);
-    friend void swap(Shader &, Shader &);
+    Shader(const Shader&) = delete;
+    Shader(Shader &&);
 
     // TODO: Make sure the type matches the correct uniform variable
     template <typename T>
@@ -86,23 +84,17 @@ public:
     
     void use();
 
-    void bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<const Texture>>> &bindings);
-
-    template <typename T>
-    void set(Uniform<T> &uniform, const T &value) {
-        this->use();
-        uniform.set(value);
-    }
+    void bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<Texture>>> &bindings);
 
     // FIXME: This is a bit of a hack 
-    void bind_UBO(const std::string &ubo_name, uint32_t loc);
+    void bind_UBO(const std::string &ubo_name, unsigned int loc);
 
     // Only for use within the shader.hpp file
-    uint32_t get_shader_program() const {
+    unsigned get_shader_program() const {
         return shader_program;
     }
 private:
-    uint32_t shader_program;
+    unsigned shader_program;
 };
 
 struct Sampler2D {
@@ -120,13 +112,9 @@ public:
 
     void bind() const;
 
-    uint32_t get_id() const;
-
-    uint32_t width() const;
-    uint32_t height() const;
+    unsigned get_id() const;
 private:
-    uint32_t id;
-    uint32_t m_width, m_height;
+    unsigned int id;
 };
 
 
@@ -149,8 +137,6 @@ void Uniform<T>::set(const T &val) {
         GLFunctionsWrapper::setivec3(loc, val);
     } else if constexpr(std::is_same<T, glm::ivec2>::value) {
         GLFunctionsWrapper::setivec2(loc, val);
-    } else if constexpr(std::is_same<T, glm::vec4>::value) {
-        GLFunctionsWrapper::setvec4(loc, val);
     } else if constexpr(std::is_same<T, glm::mat4x4>::value) {
         GLFunctionsWrapper::setmat4x4(loc, val);
     } else {
