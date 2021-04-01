@@ -4,6 +4,8 @@
 #include <string>
 #include <cassert>
 
+#include "standard.hpp"
+
 /*
     The GLFunctions wrapper provides access to opengl functions such as glUniform1i without
     polluting the global namespace. These functions should only be used in the Uniform class.
@@ -13,7 +15,9 @@ namespace GLFunctionsWrapper {
     void setFloat(int loc, const float &flt);
     void setvec3(int loc, const glm::vec3 &);
     void setvec2(int loc, const glm::vec2 &);
+    void setvec4(int loc, const glm::vec4 &);
     void setuvec2(int loc, const glm::uvec2 &);
+    void setivec2(int loc, const glm::ivec2 &);
     void setivec3(int loc, const glm::ivec3 &);
     void setmat4x4(int loc, const glm::mat4x4 &);
 
@@ -24,16 +28,9 @@ namespace GLFunctionsWrapper {
     struct shader_is_implemented {
         static const bool value = std::is_same<T, float>::value || std::is_same<T, glm::vec3>::value || std::is_same<T, glm::vec2>::value ||
                             std::is_same<T, glm::uvec2>::value || std::is_same<T, glm::ivec3>::value || std::is_same<T, glm::mat4x4>::value ||
-                            std::is_same<T, uint32_t>::value;
+                            std::is_same<T, uint32_t>::value || std::is_same<T, glm::ivec2>::value || std::is_same<T, glm::vec4>::value;
     };
 
-    // This forces the static_assert to evaluate on the type argument rather than evaluating
-    // all the time
-    // This allows the enforcement of certain types being implemented
-    template <typename T>
-    struct always_false {
-        static const bool value = false;
-    };
 };
 
 class Shader;
@@ -71,8 +68,9 @@ public:
     Shader();
     ~Shader();
 
-    Shader(const Shader&) = delete;
-    Shader(Shader &&);
+    Shader& operator=(Shader rhs);
+    Shader(Shader &&shader);
+    friend void swap(Shader &, Shader &);
 
     // TODO: Make sure the type matches the correct uniform variable
     template <typename T>
@@ -88,17 +86,23 @@ public:
     
     void use();
 
-    void bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<Texture>>> &bindings);
+    void bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<const Texture>>> &bindings);
+
+    template <typename T>
+    void set(Uniform<T> &uniform, const T &value) {
+        this->use();
+        uniform.set(value);
+    }
 
     // FIXME: This is a bit of a hack 
-    void bind_UBO(const std::string &ubo_name, unsigned int loc);
+    void bind_UBO(const std::string &ubo_name, uint32_t loc);
 
     // Only for use within the shader.hpp file
-    unsigned get_shader_program() const {
+    uint32_t get_shader_program() const {
         return shader_program;
     }
 private:
-    unsigned shader_program;
+    uint32_t shader_program;
 };
 
 struct Sampler2D {
@@ -116,9 +120,15 @@ public:
 
     void bind() const;
 
-    unsigned get_id() const;
+    uint32_t get_id() const;
+
+    uint32_t width() const;
+    uint32_t height() const;
+
+    frect rect() const;
 private:
-    unsigned int id;
+    uint32_t id;
+    uint32_t m_width, m_height;
 };
 
 
@@ -139,11 +149,15 @@ void Uniform<T>::set(const T &val) {
         GLFunctionsWrapper::setuvec2(loc, val);
     } else if constexpr(std::is_same<T, glm::ivec3>::value) {
         GLFunctionsWrapper::setivec3(loc, val);
+    } else if constexpr(std::is_same<T, glm::ivec2>::value) {
+        GLFunctionsWrapper::setivec2(loc, val);
+    } else if constexpr(std::is_same<T, glm::vec4>::value) {
+        GLFunctionsWrapper::setvec4(loc, val);
     } else if constexpr(std::is_same<T, glm::mat4x4>::value) {
         GLFunctionsWrapper::setmat4x4(loc, val);
     } else {
         // if the type has not been implemented this function will fail at compile time
-        static_assert(GLFunctionsWrapper::always_false<T>::value);
+        static_assert(always_false<T>::value);
     }
 }
 
@@ -153,6 +167,6 @@ T Uniform<T>::get() const {
         return this->value;
     } else {
         // if the type has not been implemented this function will fail at compile time
-        static_assert(GLFunctionsWrapper::always_false<T>::value);
+        static_assert(always_false<T>::value, "Type has not been implemented");
     }
 }

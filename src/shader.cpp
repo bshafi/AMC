@@ -9,19 +9,26 @@ Shader::Shader(const std::string &vertex, const std::string &fragment) {
     ASSERT_ON_GL_ERROR();
     assert(this->shader_program != 0);
 }
+
+
 Shader::~Shader() {
     glDeleteProgram(shader_program);
 }
 
-Shader::Shader(Shader &&other) {
-    if (this != &other) {
-        glDeleteShader(this->shader_program);
-        this->shader_program = other.shader_program;
-
-        other.shader_program = 0;
-    }
-    assert(this->shader_program != 0);
+Shader& Shader::operator=(Shader rhs) {
+    swap(*this, rhs);
+    return *this;
 }
+Shader::Shader(Shader &&shader)
+    : shader_program{ 0 } {
+    swap(*this, shader);
+}
+void swap(Shader &rhs, Shader &lhs) {
+    using std::swap;
+
+    swap(rhs.shader_program, lhs.shader_program);
+}
+
 
 void Shader::use() {
     assert(this->shader_program != 0);
@@ -33,7 +40,7 @@ void Shader::use() {
 }
 
 
-void Shader::bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<Texture>>> &things) {
+void Shader::bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<const Texture>>> &things) {
     // TODO: Remove the magic number 16
     assert(things.size() <= 16);
     unsigned i = 0;
@@ -67,8 +74,10 @@ void Shader::bind_UBO(const std::string &ubo_name, unsigned int loc) {
 }
 
 Texture::Texture(const std::string &path) {
-    this->id = LoadImage(path);
+    this->id = LoadImage(path, &m_width, &m_height);
     assert(this->id != 0);
+    assert(m_width != 0);
+    assert(m_height != 0);
 }
 Texture::~Texture() {
     glDeleteTextures(1, &this->id);
@@ -78,14 +87,28 @@ Texture::Texture(Texture &&other) {
     if (this != &other) {
         glDeleteTextures(1, &this->id);
         this->id = other.id;
+        this->m_height = other.m_height;
+        this->m_width = other.m_width;
+
         other.id = 0;
+        other.m_height = 0;
+        other.m_width = 0;
     }
 
     assert(this->id != 0);
+    assert(m_width != 0);
+    assert(m_height != 0);
 }
 
 void Texture::bind() const {
     glBindTexture(GL_TEXTURE_2D, this->id);
+}
+
+uint32_t Texture::width() const {
+    return m_width;
+}
+uint32_t Texture::height() const {
+    return m_height;
 }
 
 
@@ -93,6 +116,14 @@ unsigned Texture::get_id() const {
     return this->id;
 }
 
+frect Texture::rect() const {
+    return frect{
+        0,
+        0,
+        static_cast<float>(width()),
+        static_cast<float>(height())
+    };
+}
 
 void GLFunctionsWrapper::setuint(int loc, const uint32_t &i) {
     glUniform1ui(loc, i);
@@ -108,6 +139,9 @@ void GLFunctionsWrapper::setvec3(int loc, const glm::vec3 &v) {
 void GLFunctionsWrapper::setvec2(int loc, const glm::vec2 &v) {
     glUniform2f(loc, v.x, v.y);
 }
+void GLFunctionsWrapper::setvec4(int loc, const glm::vec4 &v) {
+    glUniform4f(loc, v.x, v.y, v.z, v.w);
+}
 
 void GLFunctionsWrapper::setuvec2(int loc, const glm::uvec2 &v) {
     glUniform2ui(loc, v.x, v.y);
@@ -117,6 +151,9 @@ int GLFunctionsWrapper::getUniformLocation(int shader_program, const std::string
     ASSERT_ON_GL_ERROR();
 
     return ret;
+}
+void GLFunctionsWrapper::setivec2(int loc, const glm::ivec2 &v) {
+    glUniform2i(loc, v.x, v.y);
 }
 
 void GLFunctionsWrapper::setivec3(int loc, const glm::ivec3 &v) {

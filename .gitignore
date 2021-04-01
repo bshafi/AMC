@@ -42,3 +42,9 @@ _3rdParty/*
 MakeFile
 CMakeCache.txt
 .DS_Store
+
+# Save Backups
+backup/*
+local/*
+LatestGate.json
+hunter-v0.23.296.tar.gz

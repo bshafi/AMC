@@ -1,0 +1,162 @@
+#include <istream>
+#include <ostream>
+#include <iomanip>
+
+#include "gl_helper.hpp"
+
+#include "standard.hpp"
+
+
+#if SDL_BYTEORDER == SDL_LIL_ENDIAN
+
+    template <>
+    uint8_t local_endian_to_big_endian(uint8_t value) {
+        return value;
+    }
+
+    template <>
+    uint8_t big_endian_to_local_endian(uint8_t value) {
+        return value;
+    }
+
+    template <>
+    uint32_t local_endian_to_big_endian(uint32_t value) {
+        return SDL_Swap32(value);
+    }
+
+    template <>
+    uint32_t big_endian_to_local_endian(uint32_t value) {
+        return SDL_Swap32(value);
+    }
+
+    template <>
+    uint64_t local_endian_to_big_endian(uint64_t value) {
+        return SDL_Swap64(value);
+    }
+
+    template <>
+    uint64_t big_endian_to_local_endian(uint64_t value) {
+        return SDL_Swap64(value);
+    }
+
+    template <>
+    int32_t local_endian_to_big_endian(int32_t value) {
+        return static_cast<int32_t>(local_endian_to_big_endian<uint32_t>(static_cast<uint32_t>(value)));
+    }
+
+    template <>
+    int32_t big_endian_to_local_endian(int32_t value) {
+        return static_cast<int32_t>(big_endian_to_local_endian<uint32_t>(static_cast<uint32_t>(value)));
+    }
+#elif SDL_BYTEORDER == SDL_BIG_ENDIAN
+    // If the native endian is already big_endian no conversions need to be done and only the type needs to be returned
+    #define JUST_RETURN_VALUE(type) \
+        template <> \
+        type local_endian_to_big_endian(type value) { \
+            return value; \
+        } \
+        \
+        template <> \
+        type big_endian_to_local_endian(type value) { \
+            return value; \
+        }
+
+    JUST_RETURN_VALUE(uint8_t)
+    JUST_RETURN_VALUE(uint32_t)
+    JUST_RETURN_VALUE(int32_t)
+    JUST_RETURN_VALUE(uint64_t)
+
+    #undef JUST_RETURN_VALUE
+#else
+#error "SDL_BYTEORDER not defined"
+#endif
+
+
+bool ranges_overlap(float x0, float x0_offset, float x1, float x1_offset) {
+    return (x0 <= x1 && x1 <= x0 + x0_offset) || (x0 <= x1 + x1_offset && x1 + x1_offset <= x0 + x0_offset);
+}
+
+
+AABB::AABB(float w, float h, float l) {
+    width = w;
+    height = h;
+    length = l;
+}
+
+bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1) {
+    return ranges_overlap(pos0.x,  aabb0.width, pos1.x, aabb1.width) &&
+           ranges_overlap(pos0.y, aabb0.height, pos1.y, aabb1.height) &&
+           ranges_overlap(pos0.z, aabb0.length, pos1.z, aabb1.length);
+}
+
+frect::operator glm::vec4() const {
+    return glm::vec4(x, y, w, h);
+}
+bool frect::contains(const glm::vec2 &pos) const {
+    return this->x <= pos.x && pos.x <= this->x + this->w && this->y <= pos.y && pos.y <= this->y + this->h;
+}
+
+glm::vec2 frect::top_left() const {
+    return glm::vec2(x, y);
+}
+glm::vec2 frect::bottom_right() const {
+    return glm::vec2(x, y) + glm::vec2(w, h);
+}
+frect frect::inset_by(const float f) const {
+    assert(0 <= f && f <= 1);
+    const float k = fminf(w, h) * f;
+    return frect{
+        x + k / 2,
+        y + k / 2,
+        w - k,
+        h - k
+    };
+}
+frect vec4_to_frect(const glm::vec4 &v) {
+    return frect{ v.x, v.y, v.z, v.w };
+}
+frect min_max_scaling(const frect &inner, const frect &outer) {
+    float scale = std::min(outer.w / inner.w, outer.h / inner.h);
+    float new_width = inner.w * scale;
+    float new_height = inner.h * scale;
+    return frect {
+        outer.x + (outer.w - new_width) / 2.f,
+        outer.y + (outer.h - new_height) / 2.f,
+        new_width,
+        new_height
+    };
+}
+frect apply_equivalent_transformation(const frect &pre_transform, const frect &post_transform, const frect &inner) {
+    // ul -> upper left
+    // br -> upper right
+    const glm::vec2 pre_transform_ul = glm::vec2(pre_transform.x, pre_transform.y);
+    const glm::vec2 pre_transform_br = pre_transform_ul + glm::vec2(pre_transform.w, pre_transform.h);
+
+    const glm::vec2 post_transform_ul = glm::vec2(post_transform.x, post_transform.y);
+    const glm::vec2 post_transform_br = post_transform_ul + glm::vec2(post_transform.w, post_transform.h);
+
+    const glm::vec2 pre_inner_ul = glm::vec2(inner.x, inner.y);
+    const glm::vec2 pre_inner_br = pre_inner_ul + glm::vec2(inner.w, inner.h);
+
+    // post = A * pre + B
+    const glm::vec2 a = (post_transform_br - post_transform_ul) / (pre_transform_br - pre_transform_ul);
+    const glm::vec2 b = post_transform_ul - a * pre_transform_ul;
+    if (glm::length(b - (post_transform_br - a * pre_transform_br)) >= 0.0001f) {
+        std::cout << "Off by " << glm::length(b - (post_transform_br - a * pre_transform_br)) << std::endl;
+        assert(false);
+    }
+
+    const glm::vec2 post_inner_ul = a * pre_inner_ul + b;
+    const glm::vec2 post_inner_br = a * pre_inner_br + b;
+    const glm::vec2 post_width_height = post_inner_br - post_inner_ul;
+    return frect{ post_inner_ul.x, post_inner_ul.y, post_width_height.x, post_width_height.y };
+}
+std::ostream& operator<<(std::ostream &os, const frect &rect) {
+    const uint32_t width = 5;
+    return os << "{ "  << std::setw(width) << rect.x << ", " << std::setw(width) << rect.y << ", " << std::setw(width) << rect.w << ", " << std::setw(width) << rect.h << " }";
+}
+
+
+color::operator glm::vec4() const {
+    return glm::vec4(r, g, b, a);
+}
