@@ -2,9 +2,27 @@ cmake_minimum_required(VERSION 3.2)
 set(CMAKE_CXX_STANDARD 17)
 
 include("cmake/HunterGate.cmake")
+
+if (NOT HUNTER_URL AND NOT HUNTER_SHA1)
+  file(
+    DOWNLOAD https://api.github.com/repos/cpp-pm/hunter/releases/latest
+    ${CMAKE_BINARY_DIR}/LatestGate.json)
+
+  file(READ ${CMAKE_BINARY_DIR}/LatestGate.json latestGateJson)
+  string(REGEX MATCH "tag_name\": \"([a-z0-9.]+)\"" tagName "${latestGateJson}")
+
+  set(hunterUrlTarball "https://github.com/cpp-pm/hunter/archive/${CMAKE_MATCH_1}.tar.gz")
+  set(hunterLocalTarballName "${CMAKE_BINARY_DIR}/hunter-${CMAKE_MATCH_1}.tar.gz")
+
+  file(DOWNLOAD ${hunterUrlTarball} "${hunterLocalTarballName}")
+
+  file(SHA1 "${hunterLocalTarballName}" HUNTER_SHA1)
+  set(HUNTER_URL "file://${hunterLocalTarballName}")
+endif()
+
 HunterGate(
-    URL "https://github.com/cpp-pm/hunter/archive/v0.23.272.tar.gz"
-    SHA1 "02cdafca02692376d55e549acf85a34445907a43"
+    URL ${HUNTER_URL}
+    SHA1 ${HUNTER_SHA1}
 )
 
 set(CMAKE_CXX_COMPILER /usr/local/opt/llvm@11/bin/clang++)
@@ -49,7 +67,11 @@ hunter_add_package(glm)
 find_package(glm REQUIRED)
 list(APPEND TEMP_LIBRARIES glm)
 
-add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp src/gui.cpp src/standard.cpp src/world.cpp src/chunk.cpp src/player.cpp)
+hunter_add_package(OpenAL)
+find_package(OpenAL CONFIG REQUIRED)
+list(APPEND OpenAL::OpenAL)
+
+add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp src/standard.cpp src/world.cpp src/chunk.cpp src/player.cpp src/inventory.cpp src/gui.cpp src/gui_element_visitor.cpp src/tool.cpp)
 target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
 
 string(TIMESTAMP CURRENT_DATE_TIME "%Y_%m_%d_%H_%M_%S")

@@ -155,7 +155,7 @@ HelloCube::HelloCube() : rotation_around_y_axis{ 0.0f } {
     glBindTexture(GL_TEXTURE_2D, block_texture);
     
 
-    block_texture = LoadImage("resources/hello_cube_orientation.png");
+    block_texture = LoadImage("resources/hello_cube_orientation.png", nullptr, nullptr);
 }
 HelloCube::~HelloCube() {
     this->destroy();

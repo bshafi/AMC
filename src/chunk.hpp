@@ -12,6 +12,7 @@ enum BlockType : uint32_t {
     Stone = 3
 };
 
+
 union SDL_Event;
 /*
     A 16x x 16z x 255y Chunk of blocks

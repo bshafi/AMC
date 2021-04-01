@@ -46,3 +46,5 @@ CMakeCache.txt
 # Save Backups
 backup/*
 local/*
+LatestGate.json
+hunter-v0.23.296.tar.gz

@@ -90,24 +90,42 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
         }
             break;
         default:
-            if (event.type == WINDOW_TRUE_RESIZE_EVENT) {
-                // TODO: Use true window resize instead of window resize event
-                printf("TODO: Need ot implement true resize\n");
-            }
             break;
         }
-        if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-            SDL_SetRelativeMouseMode(SDL_TRUE);
+        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_E) {
+            inventory.toggle();
+            SDL_SetRelativeMouseMode(!inventory.is_open() ? SDL_TRUE : SDL_FALSE);
         }
-        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
-            SDL_SetRelativeMouseMode(SDL_FALSE);
-        }
-        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
-            player.jump(*this);
-        }
-        if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
-            player.look_right(M_PI * event.motion.xrel / 1000.0f, *this);
-            player.look_up(-M_PI * event.motion.yrel / 1000.0f, *this);
+        if (inventory.is_open()) {
+            const auto outer = frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) };
+            inventory.handle_events(event, outer, 0);
+
+            if (event.type == SDL_MOUSEBUTTONDOWN) {
+                /*
+                const auto mouse_pos = glm::vec2(glm::ivec2(event.button.x, event.button.y));
+                const auto space_pos = inventory.get_space_from_mouse_pos(mouse_pos, outer);
+                if (space_pos.has_value()) {
+                    auto space = inventory.pop_space(space_pos->x, space_pos->y);
+                }
+                */
+            }
+        } else {
+            if (event.type == SDL_MOUSEBUTTONDOWN && SDL_GetRelativeMouseMode() == SDL_FALSE && event.button.button == SDL_BUTTON_LEFT) {
+                SDL_SetRelativeMouseMode(SDL_TRUE);
+            }
+            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+                
+            }
+            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+                SDL_SetRelativeMouseMode(SDL_FALSE);
+            }
+            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+                player.jump(*this);
+            }
+            if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
+                player.look_right(M_PI * event.motion.xrel / 1000.0f, *this);
+                player.look_up(-M_PI * event.motion.yrel / 1000.0f, *this);
+            }
         }
 
         ASSERT_ON_GL_ERROR();
@@ -115,21 +133,23 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
 
     const float speed = 0.4f;
 
-    const auto keypresses = SDL_GetKeyboardState(NULL);
-    if (keypresses[SDL_SCANCODE_A]) {
-        player.move_right(-speed, *this);
-    }
-    if (keypresses[SDL_SCANCODE_D]) {
-        player.move_right(speed, *this);
-    }
-    if (keypresses[SDL_SCANCODE_S])  {
-        player.move_forward(-speed, *this);
-    }
-    if (keypresses[SDL_SCANCODE_W])  {
-        player.move_forward(speed, *this);
-    }
-    if (keypresses[SDL_SCANCODE_F3]) {
-        player.toggle_debug_mode(*this);
+    if (!inventory.is_open()) {
+        const auto keypresses = SDL_GetKeyboardState(NULL);
+        if (keypresses[SDL_SCANCODE_A]) {
+            player.move_right(-speed, *this);
+        }
+        if (keypresses[SDL_SCANCODE_D]) {
+            player.move_right(speed, *this);
+        }
+        if (keypresses[SDL_SCANCODE_S])  {
+            player.move_forward(-speed, *this);
+        }
+        if (keypresses[SDL_SCANCODE_W])  {
+            player.move_forward(speed, *this);
+        }
+        if (keypresses[SDL_SCANCODE_F3]) {
+            player.toggle_debug_mode(*this);
+        }
     }
     player.apply_gravity(*this);
 }
@@ -164,8 +184,6 @@ void World::draw() {
     
     ASSERT_ON_GL_ERROR();
 
-
-
     shader.bind_texture_to_sampler_2D({
         { "orientation", orientation_texture },
         { "blocks", blocks_texture }
@@ -189,6 +207,8 @@ void World::draw() {
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    inventory.draw(frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) }, 0);
 
     ASSERT_ON_GL_ERROR();
 }
@@ -273,11 +293,9 @@ void World::load(const std::string &path) {
             assert(blocks_in_chunk == Chunk::BLOCKS_IN_CHUNK);
 
             pad16();
-
             for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
                 chunk.SetBlock(pos, read_binary<Chunk::BlockIDType>(file));
             }
-
             pad16();
         }
 

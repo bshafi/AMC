@@ -1,8 +1,10 @@
 #include <array>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 
 #include "gl_helper.hpp"
+#include "gui.hpp"
 
 constexpr uint32_t DEFAULT_SDL_INIT_FLAGS = SDL_INIT_EVERYTHING;
 constexpr uint32_t DEFAULT_IMG_INIT_FLAGS = IMG_INIT_PNG;
@@ -11,11 +13,17 @@ constexpr SDL_Color WHITE = { 255, 255, 255, 255 };
 
 TTF_Font *default_font = nullptr;
 
-uint32_t WINDOW_TRUE_RESIZE_EVENT;
 uint32_t SCENE_CHANGE_EVENT;
 
+struct FilterData {
+    std::mutex filter_mutex;
+    glm::uvec2 fake_window_bounds = glm::uvec2(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
+    glm::uvec2 true_window_bounds = glm::uvec2(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
+    SDL_GLContext context;
+    SDL_Window *window = nullptr;
+} filter_data;
 
-void Init_SDL_and_GL() {
+SDL_Window *Init_SDL_and_GL() {
     assert(SDL_Init(DEFAULT_SDL_INIT_FLAGS) == 0);
     assert(IMG_Init(DEFAULT_IMG_INIT_FLAGS) == DEFAULT_IMG_INIT_FLAGS);
     assert(TTF_Init() == 0);
@@ -31,12 +39,65 @@ void Init_SDL_and_GL() {
     //SDL_SetHint(SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG, "1");
     assert(SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1") == SDL_TRUE);
 
-    WINDOW_TRUE_RESIZE_EVENT = SDL_RegisterEvents(1);
-    assert(WINDOW_TRUE_RESIZE_EVENT != (uint32_t)-1);
     SCENE_CHANGE_EVENT = SDL_RegisterEvents(1);
     assert(SCENE_CHANGE_EVENT != (uint32_t)-1);
+
+
+    SDL_Window *window = SDL_CreateWindow(
+        "Another Minecraft Clone", 
+        SDL_WINDOWPOS_CENTERED,
+        SDL_WINDOWPOS_CENTERED, 
+        INITIAL_WINDOW_WIDTH,
+        INITIAL_WINDOW_HEIGHT, 
+        DEFAULT_SDL_WINDOW_FLAGS
+    );
+
+    filter_data.filter_mutex.lock();
+    filter_data.window = window;
+    {
+        int w, h;
+        SDL_GL_GetDrawableSize(window, &w, &h);
+        filter_data.true_window_bounds = glm::uvec2(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+
+        filter_data.context = SDL_GL_CreateContext(window);
+        assert(filter_data.context);
+
+        assert(glewInit() == GLEW_OK);
+
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glClearColor(135 / 255.f, 206 / 255.f,235 / 255.f, 1.0f);
+
+    }
+    filter_data.filter_mutex.unlock();
+
+    SDL_SetEventFilter(
+        [](void *userdata, SDL_Event *event){
+            FilterData *filter_data = static_cast<FilterData*>(userdata);
+            filter_data->filter_mutex.lock();
+
+            *event = filter_events(filter_data->window, filter_data->fake_window_bounds, filter_data->true_window_bounds, *event);
+
+            filter_data->filter_mutex.unlock();
+            return 1;
+        },
+        &filter_data
+    );
+
+
+
+
+    Renderer::Initialize();
+
+    return window;
 }
 void Quit_SDL_and_GL() {
+    Renderer::Terminate();
+
+    filter_data.filter_mutex.lock();
+    SDL_GL_DeleteContext(filter_data.context);
+    filter_data.filter_mutex.unlock();
 
     TTF_CloseFont(default_font);
 
@@ -45,18 +106,53 @@ void Quit_SDL_and_GL() {
     SDL_Quit();
 }
 
-void PushWindowTrueResizeEvent(int width, int height) {
-    SDL_Event event;
-    SDL_zero(event);
+SDL_Event filter_events(SDL_Window *window, glm::uvec2 &fake_window_bounds, glm::uvec2 &window_bounds, const SDL_Event &event) {
+    SDL_Event true_event = event;
+    switch (event.type) {
+    case SDL_MOUSEMOTION: {
+        const glm::vec2 fake_rel = glm::vec2(event.motion.xrel, event.motion.yrel);
+        const glm::vec2 fake_pos = glm::vec2(event.motion.x, event.motion.y);
+        const glm::vec2 true_pos = (fake_pos * glm::vec2(window_bounds)) / glm::vec2(fake_window_bounds);
+        const glm::vec2 true_rel = true_pos - ((fake_pos - fake_rel) * glm::vec2(window_bounds)) / glm::vec2(fake_window_bounds);
 
-    event.type = WINDOW_TRUE_RESIZE_EVENT;
-    event.user.data1 = reinterpret_cast<void*>(static_cast<intptr_t>(width));
-    event.user.data2 = reinterpret_cast<void*>(static_cast<intptr_t>(height));
-    if (SDL_PushEvent(&event) != 1) {
-        printf("Could not push window true resize event\n");
+        true_event.motion.x = static_cast<int>(true_pos.x);
+        true_event.motion.y = static_cast<int>(true_pos.y);
+
+        true_event.motion.xrel = static_cast<int>(true_rel.x);
+        true_event.motion.yrel = static_cast<int>(true_rel.y);
     }
+        break;
+    case SDL_MOUSEBUTTONDOWN: // continue;
+    case SDL_MOUSEBUTTONUP: {
+        const glm::vec2 fake_pos = glm::vec2(event.button.x, event.button.y);
+        const glm::vec2 true_pos = (fake_pos * glm::vec2(window_bounds)) / glm::vec2(fake_window_bounds);
+        true_event.button.x = static_cast<int>(true_pos.x);
+        true_event.button.y = static_cast<int>(true_pos.y);
+    }
+        break;
+    case SDL_WINDOWEVENT: {
+        switch (event.window.event) {
+        case SDL_WINDOWEVENT_RESIZED:
+            fake_window_bounds.x = event.window.data1;
+            fake_window_bounds.y = event.window.data2;
+            int w, h;
+            SDL_GL_GetDrawableSize(window, &w, &h);
+            //PushWindowTrueResizeEvent(w, h);
+            glViewport(0, 0, w, h);
+            window_bounds = glm::uvec2(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+            true_event.window.data1 = static_cast<int32_t>(window_bounds.x);
+            true_event.window.data2 = static_cast<int32_t>(window_bounds.y);
+            break;
+        default:
+            break;
+        }
+    }
+        break;
+    default:
+        break;
+    }
+    return true_event;
 }
-
 void PushSceneChangeEvent(const SceneChangeData &_scene_change_data) {
     auto *scene_change_data = new SceneChangeData(_scene_change_data);
 
@@ -135,16 +231,18 @@ unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::s
     return shaderProgram;
 }
 
-uint32_t LoadImage(const std::string &imagePath) {
+uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *height) {
     SDL_Surface *original = IMG_Load(imagePath.c_str());
-    assert(original);
-
     SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
-    // Flips texture so that OpenGl renders it properly
-    for (int i = 0; i < original->h; ++i) {
-        SDL_Rect source = { 0, i, original->w, 1 };
-        SDL_Rect dest = { 0, original->h - 1 - i, modified->w, 1 };
-        SDL_BlitSurface(original, &source, modified, &dest);
+    SDL_BlitSurface(original, nullptr, modified, nullptr);
+    SDL_FreeSurface(original);
+
+
+    if (width != nullptr) {
+        *width = modified->w;
+    }
+    if (height != nullptr) {
+        *height = modified->h;
     }
 
     unsigned int texture;
@@ -159,24 +257,15 @@ uint32_t LoadImage(const std::string &imagePath) {
     glGenerateMipmap(GL_TEXTURE_2D);
 
     SDL_FreeSurface(modified);
-    SDL_FreeSurface(original);
 
     return texture;
+
 }
 
 uint32_t RasterizeText(const std::string &text) {
     assert(default_font);
 
-    SDL_Surface *original = TTF_RenderText_Blended(default_font, text.c_str(), WHITE);
-    assert(original);
-
-    SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
-    // Flips texture so that OpenGl renders it properly
-    for (int i = 0; i < original->h; ++i) {
-        SDL_Rect source = { 0, i, original->w, 1 };
-        SDL_Rect dest = { 0, original->h - 1 - i, modified->w, 1 };
-        SDL_BlitSurface(original, &source, modified, &dest);
-    }
+    SDL_Surface *modified = TTF_RenderText_Blended(default_font, text.c_str(), WHITE);
 
     unsigned int texture;
     glGenTextures(1, &texture);
@@ -190,7 +279,6 @@ uint32_t RasterizeText(const std::string &text) {
     glGenerateMipmap(GL_TEXTURE_2D);
 
     SDL_FreeSurface(modified);
-    SDL_FreeSurface(original);
 
     return texture;
 }
@@ -213,7 +301,21 @@ bool glBreakOnError() {
 
     return true;
 }
+glm::uvec2 GetTrueWindowSize() {
+    /*
+    int w, h;
 
+    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &w, &h);
+    //std::cout << w << ", " << h << std::endl;
+
+    return glm::uvec2(w, h);
+    */
+   filter_data.filter_mutex.lock();
+   auto window_size = filter_data.true_window_bounds;
+   filter_data.filter_mutex.unlock();
+
+   return window_size;
+}
 
 // Assume that the gl types are the same as the cpp types
 static_assert(std::is_same<uint32_t, GLuint>::value);
