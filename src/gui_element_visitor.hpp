@@ -2,7 +2,7 @@
 
 #include "standard.hpp"
 
-class Sprite;
+class GUIImage;
 class ZStack;
 class Button;
 class HBisection;
@@ -14,7 +14,7 @@ class Inventory;
 class GUIElementVisitor {
 public:
     void visit(GUIElement *element, const frect &outer, const uint32_t depth);
-    virtual void visit(Sprite &);
+    virtual void visit(GUIImage &);
     virtual void visit(ZStack &);
     virtual void visit(Button &);
     virtual void visit(HBisection &);
@@ -26,7 +26,7 @@ private:
 class ConstGUIElementVisitor {
 public:
     void visit(GUIElement * const element, const frect &outer, const uint32_t depth);
-    virtual void visit(const Sprite &);
+    virtual void visit(const GUIImage &);
     virtual void visit(const ZStack &);
     virtual void visit(const Button &);
     virtual void visit(const HBisection &);

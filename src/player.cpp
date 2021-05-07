@@ -1,6 +1,8 @@
 #include "world.hpp"
 #include "player.hpp"
 
+float Player::gravity = 9.8f;
+
 Player::Player() {
     debug_mode = true;
     aabb = { 0.9, 2, 0.9 };

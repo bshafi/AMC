@@ -6,6 +6,11 @@
 #include "gl_helper.hpp"
 #include "gui.hpp"
 
+#define IMGUI_IMPL_OPENGL_LOADER_GLEW
+#include "imgui.h"
+#include "imgui_impl_sdl.h"
+#include "imgui_impl_opengl3.h"
+
 constexpr uint32_t DEFAULT_SDL_INIT_FLAGS = SDL_INIT_EVERYTHING;
 constexpr uint32_t DEFAULT_IMG_INIT_FLAGS = IMG_INIT_PNG;
 constexpr uint32_t DEFAULT_FONT_SIZE = 24;
@@ -20,7 +25,6 @@ struct FilterData {
     glm::uvec2 fake_window_bounds = glm::uvec2(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
     glm::uvec2 true_window_bounds = glm::uvec2(INITIAL_WINDOW_WIDTH, INITIAL_WINDOW_HEIGHT);
     SDL_GLContext context;
-    SDL_Window *window = nullptr;
 } filter_data;
 
 SDL_Window *Init_SDL_and_GL() {
@@ -35,6 +39,10 @@ SDL_Window *Init_SDL_and_GL() {
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2) == 0);
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE) == 0);
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG) == 0);
+
+    assert(SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1) == 0);
+    assert(SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24) == 0);
+    assert(SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8) == 0);
 
     //SDL_SetHint(SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG, "1");
     assert(SDL_SetHint(SDL_HINT_VIDEO_HIGHDPI_DISABLED, "1") == SDL_TRUE);
@@ -53,7 +61,6 @@ SDL_Window *Init_SDL_and_GL() {
     );
 
     filter_data.filter_mutex.lock();
-    filter_data.window = window;
     {
         int w, h;
         SDL_GL_GetDrawableSize(window, &w, &h);
@@ -72,12 +79,16 @@ SDL_Window *Init_SDL_and_GL() {
     }
     filter_data.filter_mutex.unlock();
 
+    // Using SDL_SetEventFilter instead of SDL_AddEventWatch
+    // Even thought SDL_AddEventWatch allows smooth resizing behavior the
+    // screen would have to be redrawn forcing global data access overcomplicating the project
+    
     SDL_SetEventFilter(
         [](void *userdata, SDL_Event *event){
             FilterData *filter_data = static_cast<FilterData*>(userdata);
             filter_data->filter_mutex.lock();
 
-            *event = filter_events(filter_data->window, filter_data->fake_window_bounds, filter_data->true_window_bounds, *event);
+            *event = filter_events(filter_data->fake_window_bounds, filter_data->true_window_bounds, *event);
 
             filter_data->filter_mutex.unlock();
             return 1;
@@ -85,14 +96,26 @@ SDL_Window *Init_SDL_and_GL() {
         &filter_data
     );
 
+    filter_data.filter_mutex.lock();
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    auto io = ImGui::GetIO();
+    ImGui::StyleColorsDark();
+    ImGui_ImplSDL2_InitForOpenGL(window, filter_data.context);
+    ImGui_ImplOpenGL3_Init("#version 150");
 
-
+    filter_data.filter_mutex.unlock();
 
     Renderer::Initialize();
 
     return window;
 }
 void Quit_SDL_and_GL() {
+
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
+    ImGui::DestroyContext();
+
     Renderer::Terminate();
 
     filter_data.filter_mutex.lock();
@@ -106,7 +129,7 @@ void Quit_SDL_and_GL() {
     SDL_Quit();
 }
 
-SDL_Event filter_events(SDL_Window *window, glm::uvec2 &fake_window_bounds, glm::uvec2 &window_bounds, const SDL_Event &event) {
+SDL_Event filter_events(glm::uvec2 &fake_window_bounds, glm::uvec2 &window_bounds, const SDL_Event &event) {
     SDL_Event true_event = event;
     switch (event.type) {
     case SDL_MOUSEMOTION: {
@@ -132,16 +155,19 @@ SDL_Event filter_events(SDL_Window *window, glm::uvec2 &fake_window_bounds, glm:
         break;
     case SDL_WINDOWEVENT: {
         switch (event.window.event) {
-        case SDL_WINDOWEVENT_RESIZED:
+        case SDL_WINDOWEVENT_RESIZED: {
+            SDL_Window *window = SDL_GetWindowFromID(event.window.windowID);
+            assert(window);
+
             fake_window_bounds.x = event.window.data1;
             fake_window_bounds.y = event.window.data2;
             int w, h;
             SDL_GL_GetDrawableSize(window, &w, &h);
-            //PushWindowTrueResizeEvent(w, h);
             glViewport(0, 0, w, h);
             window_bounds = glm::uvec2(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
             true_event.window.data1 = static_cast<int32_t>(window_bounds.x);
             true_event.window.data2 = static_cast<int32_t>(window_bounds.y);
+        }
             break;
         default:
             break;
@@ -302,19 +328,11 @@ bool glBreakOnError() {
     return true;
 }
 glm::uvec2 GetTrueWindowSize() {
-    /*
-    int w, h;
+    filter_data.filter_mutex.lock();
+    auto window_size = filter_data.true_window_bounds;
+    filter_data.filter_mutex.unlock();
 
-    SDL_GL_GetDrawableSize(SDL_GL_GetCurrentWindow(), &w, &h);
-    //std::cout << w << ", " << h << std::endl;
-
-    return glm::uvec2(w, h);
-    */
-   filter_data.filter_mutex.lock();
-   auto window_size = filter_data.true_window_bounds;
-   filter_data.filter_mutex.unlock();
-
-   return window_size;
+    return window_size;
 }
 
 // Assume that the gl types are the same as the cpp types

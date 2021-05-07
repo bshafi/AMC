@@ -4,6 +4,16 @@
 #include "hello_cube.hpp"
 #include "chunk.hpp"
 
+frect BlockRect(const BlockType &type) {
+    return frect{
+        0,
+        static_cast<float>(static_cast<uint32_t>(type) - 1) * 8,
+        8,
+        8
+    };
+}
+
+
 Chunk::Chunk() {
 }
 

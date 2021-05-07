@@ -11,13 +11,14 @@
 #include "chunk.hpp"
 #include "gui.hpp"
 
+#include "imgui.h"
+#include "imgui_impl_opengl3.h"
+#include "imgui_impl_sdl.h"
+
 int main(const int, const char**) {
     SDL_Window *window = Init_SDL_and_GL();
 
     assert(window);
-    
-    Tool t(ToolMaterial::Wood, ToolType::Axe);
-    std::cout << static_cast<uint32_t>(t.material) << static_cast<uint32_t>(t.type) << std::endl;
 
     int width, height;
     SDL_GL_GetDrawableSize(window, &width, &height);
@@ -37,14 +38,14 @@ int main(const int, const char**) {
         ADD_POINTER(title_text);
         auto *play_button = new Texture("resources/play_button.png");
         ADD_POINTER(play_button);
-        auto *title_text_sprite = new Sprite(*title_text);
+        auto *title_text_sprite = new GUIImage(*title_text);
         ADD_POINTER(title_text_sprite);
         const auto play_button_rect = frect{ 0, 0, static_cast<float>(play_button->width()), static_cast<float>(play_button->height()) };
         const auto play_button_normal = frect{ 0, 0, play_button_rect.w, play_button_rect.h / 2 };
         const auto play_button_hover = frect{ 0, play_button_rect.h / 2, play_button_rect.w, play_button_rect.h / 2 };
         auto *play_button_sprite = new Button(*play_button, play_button_normal, play_button_hover);
         ADD_POINTER(play_button_sprite);
-        auto *title_background_sprite = new Sprite(*title_background, true);
+        auto *title_background_sprite = new GUIImage(*title_background, true);
         ADD_POINTER(title_background_sprite);
         auto *things = new HBisection(GUI::Padding(title_text_sprite, 0.1), GUI::VPadding(play_button_sprite, 0.2));
         ADD_POINTER(things);
@@ -64,6 +65,7 @@ int main(const int, const char**) {
         events.clear();
         // TODO: Filter mouse events and window resize events through here
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
+            ImGui_ImplSDL2_ProcessEvent(&event);
             switch (event.type) {
             case SDL_QUIT: 
                 is_running = false;
@@ -99,10 +101,24 @@ int main(const int, const char**) {
             break;
         }
 
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL2_NewFrame(window);
+        ImGui::NewFrame();
+
         ASSERT_ON_GL_ERROR();
 
+        {
+            ImGui::Begin("Configurations");
+            if (ImGui::Button("Toggle Debug Mode")) {
+                world.player.toggle_debug_mode(world);
+            }
+            ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
+            ImGui::End();
+        }
 
+        ImGui::Render();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
         switch (state) {
         case GameState::TitleScreen:
             gui.draw();
@@ -115,6 +131,7 @@ int main(const int, const char**) {
             break;
         }
 
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
 
         uint32_t delta_ticks = SDL_GetTicks() - ticks;

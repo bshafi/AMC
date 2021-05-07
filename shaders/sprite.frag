@@ -13,8 +13,6 @@ uniform float color_mix;
 
 void main() {
     vec4 col = texture(tex, texture_coordinates);
-    if (col.a < .1) {
-        discard;
-    }
+
     FragColor = vec4(1, 1, 1, opacity) * mix(col, color, color_mix);
 }
