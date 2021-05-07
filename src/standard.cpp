@@ -8,7 +8,6 @@
 
 
 #if SDL_BYTEORDER == SDL_LIL_ENDIAN
-
     template <>
     uint8_t local_endian_to_big_endian(uint8_t value) {
         return value;
@@ -111,6 +110,9 @@ frect frect::inset_by(const float f) const {
         w - k,
         h - k
     };
+}
+frect frect::apply_equivalent_transformation(const frect &pre, const frect &post) const {
+    return ::apply_equivalent_transformation(pre, post, *this);
 }
 frect vec4_to_frect(const glm::vec4 &v) {
     return frect{ v.x, v.y, v.z, v.w };

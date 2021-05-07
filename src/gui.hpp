@@ -22,10 +22,21 @@ union SDL_Event;
     #define REMOVE_POINTER(p) do { } while (false)
 #endif
 
+struct Sprite {
+    const Texture &texture;
+    const frect &source;
+};
+
+struct Tool;
+
 class Renderer {
 public:
-    static void draw(const Texture&, const frect &source, const frect &dest, const uint32_t &depth = 0);
-    static void draw(const frect &, const color &color, const uint32_t &depth = 0);
+    //static void draw(const Texture&, const frect &source, const frect &dest, const uint32_t &depth = 0);
+    //static void draw(const frect &, const color &color, const uint32_t &depth = 0);
+    //static void draw(const frect &, const BlockType &block_type, const uint32_t &depth = 0);
+
+    template <typename T>
+    static void draw(const frect& dest, const uint32_t depth, const T&);
 
     static void Initialize();
     static void Terminate();
@@ -33,6 +44,8 @@ private:
     static uint32_t corners_VBO;
     static uint32_t sprite_VAO;
     static std::unique_ptr<Shader> shader;
+    static std::unique_ptr<Texture> tools;
+    static std::unique_ptr<Texture> blocks;
 };
 
 class GUIElementVisitor;
@@ -49,11 +62,11 @@ public:
 private:
 };
 
-class Sprite : public GUIElement {
+class GUIImage : public GUIElement {
 public:
-    Sprite(Texture &texture, const frect &source, bool should_stretch = false);
-    Sprite(Texture &texture, bool should_stretch = false);
-    ~Sprite() {
+    GUIImage(Texture &texture, const frect &source, bool should_stretch = false);
+    GUIImage(Texture &texture, bool should_stretch = false);
+    ~GUIImage() {
 
     }
 

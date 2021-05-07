@@ -12,6 +12,7 @@ enum BlockType : uint32_t {
     Stone = 3
 };
 
+frect BlockRect(const BlockType &type);
 
 union SDL_Event;
 /*

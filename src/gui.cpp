@@ -2,6 +2,8 @@
 #include "gui_element_visitor.hpp"
 
 #include "gui.hpp"
+#include "tool.hpp"
+#include "inventory.hpp"
 
 #ifdef MANUAL_LEAK_CHECK
     std::map<uintptr_t, std::pair<std::string, uint32_t>> pointers = std::map<uintptr_t, std::pair<std::string, uint32_t>>();
@@ -20,6 +22,8 @@ const std::array<uint32_t, 6> corners = {
 uint32_t Renderer::corners_VBO = 0;
 uint32_t Renderer::sprite_VAO = 0;
 std::unique_ptr<Shader> Renderer::shader = nullptr;
+std::unique_ptr<Texture> Renderer::tools = nullptr;
+std::unique_ptr<Texture> Renderer::blocks = nullptr;
 
 void Renderer::Initialize() {
     assert(shader == nullptr);
@@ -45,6 +49,8 @@ void Renderer::Initialize() {
 
 
     shader = std::make_unique<Shader>("shaders/sprite.vert", "shaders/sprite.frag");
+    tools = std::make_unique<Texture>("resources/tools.png");
+    blocks = std::make_unique<Texture>("resources/blocks.png");
 }
 void Renderer::Terminate() {
     assert(shader != nullptr);
@@ -56,7 +62,10 @@ void Renderer::Terminate() {
 
     corners_VBO = 0;
     sprite_VAO = 0;
-    shader = nullptr;
+
+    shader.reset();
+    tools.reset();
+    blocks.reset();
 
 
     assert(shader == nullptr);
@@ -64,10 +73,14 @@ void Renderer::Terminate() {
     assert(corners_VBO == 0);
 }
 
-void Renderer::draw(const Texture &texture, const frect &source, const frect &dest, const uint32_t &depth) {
+template <>
+void Renderer::draw<Sprite>(const frect &dest, const uint32_t depth, const Sprite &sprite) {
     assert(shader != nullptr);
     assert(sprite_VAO != 0);
     assert(corners_VBO != 0);
+
+    auto &texture = sprite.texture;
+    auto &source = sprite.source;
 
     shader->bind_texture_to_sampler_2D({
         { "tex", texture }
@@ -97,7 +110,9 @@ void Renderer::draw(const Texture &texture, const frect &source, const frect &de
     glBindVertexArray(sprite_VAO);
     glDrawArrays(GL_TRIANGLES, 0, corners.size());
 }
-void Renderer::draw(const frect &dest, const color &color, const uint32_t &depth) {
+
+template <>
+void Renderer::draw<color>(const frect &dest, const uint32_t depth, const color &color) {
     assert(shader != nullptr);
     assert(sprite_VAO != 0);
     assert(corners_VBO != 0);
@@ -108,20 +123,30 @@ void Renderer::draw(const frect &dest, const color &color, const uint32_t &depth
 
     auto h_dest_rect = shader->retrieve_shader_variable<glm::vec4>("dest_rect");
     shader->set(h_dest_rect, static_cast<glm::vec4>(dest));
+    
     auto h_window_bounds = shader->retrieve_shader_variable<glm::uvec2>("window_bounds");
     shader->set(h_window_bounds, window_bounds);
+    
     auto h_color = shader->retrieve_shader_variable<glm::vec4>("color");
-    h_color.set(static_cast<glm::vec4>(color));
+    shader->set(h_color, static_cast<glm::vec4>(color));
+    
     auto h_opacity = shader->retrieve_shader_variable<float>("opacity");
-    h_opacity.set(1.f);
+    shader->set(h_opacity, 1.f);
+    
     auto h_color_mix = shader->retrieve_shader_variable<float>("color_mix");
-    h_color_mix.set(1.f);
+    shader->set(h_color_mix, 1.f);
+    
     auto h_depth = shader->retrieve_shader_variable<uint32_t>("depth");
     shader->set(h_depth, depth);
 
 
     glBindVertexArray(sprite_VAO);
     glDrawArrays(GL_TRIANGLES, 0, corners.size());
+}
+
+template <>
+void Renderer::draw(const frect &outer, const uint32_t depth, const BlockType &block_type) {
+    Renderer::draw(outer, depth, Sprite{ *Renderer::blocks, BlockRect(block_type) });
 }
 
 
@@ -157,20 +182,20 @@ GUIElement *GUI::Padding(GUIElement *element, float padding) {
 }
 
 
-Sprite::Sprite(Texture &texture, const frect &source, bool should_stretch)
+GUIImage::GUIImage(Texture &texture, const frect &source, bool should_stretch)
     : texture{ texture }, source{ source }, should_stretch{ should_stretch } {
 
 }
-Sprite::Sprite(Texture &texture, bool should_stretch)
-    : Sprite(texture, frect{ 0, 0, static_cast<float>(texture.width()), static_cast<float>(texture.height()) }, should_stretch) {
+GUIImage::GUIImage(Texture &texture, bool should_stretch)
+    : GUIImage(texture, frect{ 0, 0, static_cast<float>(texture.width()), static_cast<float>(texture.height()) }, should_stretch) {
     
 }
 
 
-void Sprite::draw(const frect &outer, const uint32_t depth) {
-    Renderer::draw(texture, source, this->dest_rect(outer), depth);
+void GUIImage::draw(const frect &outer, const uint32_t depth) {
+    Renderer::draw(this->dest_rect(outer), depth, Sprite{ texture, source });
 }
-frect Sprite::dest_rect(const frect &outer) const {
+frect GUIImage::dest_rect(const frect &outer) const {
     frect dest_rect;
     if (this->should_stretch) {
         dest_rect = outer;
@@ -242,7 +267,7 @@ Button::Button(Texture &texture, const frect &normal, const frect &on_hover, uin
 
 }
 void Button::draw(const frect &outer, const uint32_t depth) {
-    Renderer::draw(texture, source_rect(), dest_rect(outer), depth);
+    Renderer::draw(dest_rect(outer), depth, Sprite{ texture, source_rect() });
 }
 void Button::handle_events(const SDL_Event &event, const frect &outer, const uint32_t depth) {
     const auto dest_rect = this->dest_rect(outer);

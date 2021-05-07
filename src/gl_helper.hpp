@@ -54,7 +54,7 @@ struct SceneChangeData {
 
 //glm::uvec2 GetWindowBoundsFromTrueResizeEvent(const SDL_Event &event);
 glm::uvec2 GetTrueWindowSize();
-SDL_Event filter_events(SDL_Window *window, glm::uvec2 &fake_window_bounds, glm::uvec2 &window_bounds, const SDL_Event &event);
+SDL_Event filter_events(glm::uvec2 &fake_window_bounds, glm::uvec2 &window_bounds, const SDL_Event &event);
 
 
 

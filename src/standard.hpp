@@ -18,6 +18,9 @@
 template <typename A, typename B>
 using pair_vector = std::vector<std::pair<A, B>>;
 
+template <uint32_t Width, uint32_t Height, typename T>
+using Array2d = std::array<std::array<T, Height>, Width>;
+
 
 // This forces the static_assert to evaluate on the type argument rather than evaluating
 // all the time
@@ -57,6 +60,7 @@ struct frect {
     glm::vec2 top_left() const;
     glm::vec2 bottom_right() const;
     frect inset_by(const float f) const;
+    frect apply_equivalent_transformation(const frect &pre, const frect &post) const;
 };
 
 frect vec4_to_frect(const glm::vec4 &);

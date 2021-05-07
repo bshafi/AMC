@@ -8,7 +8,7 @@
 union SDL_Event;
 
 struct Space {
-    std::variant<Tool, BlockType, std::monostate> item = std::monostate{};
+    std::variant<Tool, BlockType, std::nullopt_t> item = std::nullopt;
     uint32_t stack_size = 0;
 };
 
@@ -19,11 +19,17 @@ public:
     static const uint32_t INVENTORY_SPRITE_ID;
     static const uint32_t HOTBAR_SPRITE_ID;
 
+    static const frect CELL_RECT;
+    static const frect DURABILITY_BAR_RECT;
     static const frect INVENTORY_RECT;
     static frect inventory_space(uint32_t i, uint32_t j);
     static frect crafting_grid_space(uint32_t i, uint32_t j);
     static const frect CRAFTING_GRID_RESULT_SPACE;
-    frect dest_inventory_space(uint32_t i, uint32_t j, const frect &);
+    static frect dest_inventory_space(uint32_t i, uint32_t j, const frect &);
+    static frect dest_crafting_space(uint32_t i, uint32_t j, const frect &);
+    static frect h_dest_rect(const frect &outer);
+
+
 
     void draw(const frect &outer, const uint32_t depth) override;
     void handle_events(const SDL_Event &event, const frect &outer, const uint32_t depth) override;
@@ -37,20 +43,18 @@ public:
     Inventory();
     ~Inventory();
 
-    std::optional<glm::uvec2> get_space_from_mouse_pos(const glm::vec2 &, const frect &);
-    Space pop_space(uint32_t i, uint32_t j);
-    void push_space(uint32_t i, uint32_t j, Space space);
+    std::optional<glm::uvec2> get_space_from_mouse_pos(const glm::vec2 &, const frect &) const;
+    std::optional<glm::uvec2> get_crafting_space_from_mouse_pos(const glm::vec2 &, const frect &) const;
 private:
-
     Texture inventory_texture, hotbar_texture;
 
-    std::array<std::array<Space, INVENTORY_HEIGHT>, INVENTORY_WIDTH> inventory;
-    std::optional<glm::uvec2> hovered_cell;
-    std::optional<BlockType> held_item;
+    Array2d<INVENTORY_WIDTH, INVENTORY_HEIGHT, Space> inventory;
+    std::optional<glm::uvec2> hovered_cell, selected_crafting_cell;
+    Space held_item;
     glm::vec2 mouse_pos;
     bool is_shown;
 
-    std::array<std::array<Space, CRAFTING_GRID_LENGTH>, CRAFTING_GRID_LENGTH> grid;
+    Array2d<CRAFTING_GRID_LENGTH, CRAFTING_GRID_LENGTH, Space> grid;
 };
 
 class InventoryVisitor : public GUIElementVisitor {
