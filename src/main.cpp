@@ -112,6 +112,10 @@ int main(const int, const char**) {
             if (ImGui::Button("Toggle Debug Mode")) {
                 world.player.toggle_debug_mode(world);
             }
+            {
+                float arr[3] = { world.player.position.x, world.player.position.y, world.player.position.y };
+                ImGui::InputFloat3("position", arr);
+            }
             ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
             ImGui::End();
         }

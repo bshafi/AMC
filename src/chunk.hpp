@@ -20,10 +20,10 @@ union SDL_Event;
     used to store block ids and other data that pertains to a block
  */
 struct Chunk {
-    static const unsigned BLOCKS_IN_CHUNK = 256 * 16 * 16;
-    static const unsigned CHUNK_WIDTH = 16;
-    static const unsigned CHUNK_HEIGHT = 256;
-    using BlockIDType = unsigned;
+    static const uint32_t BLOCKS_IN_CHUNK = 256 * 16 * 16;
+    static const uint32_t CHUNK_WIDTH = 16;
+    static const uint32_t CHUNK_HEIGHT = 256;
+    using BlockIDType = uint32_t;
 
     std::array<BlockIDType, CHUNK_HEIGHT * CHUNK_WIDTH * CHUNK_WIDTH> blocks;
     glm::ivec2 chunk_pos;
@@ -35,7 +35,7 @@ struct Chunk {
     static const int32_t MIN_X = 0, MAX_X = 15, MIN_Y = 0, MAX_Y = 255, MIN_Z = 0, MAX_Z = 15;
     static uint32_t world_pos_to_index(glm::ivec3 pos);
     // TODO: better name
-    // use in a for loop like for(auto pos = glm::ivec3(); loop_through(pos);)
+    // use in a for loop like for(auto pos = glm::ivec3(0, 0, 0); loop_through(pos);)
     static void loop_through(glm::ivec3 &pos);
     static bool is_within_chunk_bounds(const glm::ivec3 &pos);
 

@@ -7,8 +7,10 @@
 
 class Renderer;
 
+
 struct World {
     std::vector<Chunk> chunks;
+    std::vector<uint32_t> vertex_buffer_objects;
 
     Player player;
     Inventory inventory;
@@ -25,14 +27,11 @@ struct World {
     unsigned int VAO;
     unsigned int block_ids_VBO;
 
-
     std::string save_name;
     
     unsigned int globals_3d_ubo;
 
     static constexpr uint32_t WORLD_VERSION = 1;
-
-
     static const uint32_t DEFAULT_SEED = 0x33333333;
 
     void generate(uint32_t seed = DEFAULT_SEED) noexcept;

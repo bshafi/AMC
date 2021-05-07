@@ -56,6 +56,8 @@ World::World() :
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
     ASSERT_ON_GL_ERROR();
+
+    player.set_position(glm::vec3(26, 100, 100));
 }
 World::~World() {
     this->save(save_name);
@@ -101,13 +103,6 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
             inventory.handle_events(event, outer, 0);
 
             if (event.type == SDL_MOUSEBUTTONDOWN) {
-                /*
-                const auto mouse_pos = glm::vec2(glm::ivec2(event.button.x, event.button.y));
-                const auto space_pos = inventory.get_space_from_mouse_pos(mouse_pos, outer);
-                if (space_pos.has_value()) {
-                    auto space = inventory.pop_space(space_pos->x, space_pos->y);
-                }
-                */
             }
         } else {
             if (event.type == SDL_MOUSEBUTTONDOWN && SDL_GetRelativeMouseMode() == SDL_FALSE && event.button.button == SDL_BUTTON_LEFT) {
@@ -176,7 +171,6 @@ glm::vec3 World::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, c
 
 void World::draw() {
     ASSERT_ON_GL_ERROR();
-     
     glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
     glm::mat4 view = player.camera.view_matrix();
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
@@ -195,9 +189,11 @@ void World::draw() {
         ASSERT_ON_GL_ERROR();
 
         shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunks[i].chunk_pos);
-
+        
         glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, chunks[i].blocks.data());
+        
+        //glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_objects[i]);
 
         glBindVertexArray(VAO);
         glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
@@ -304,8 +300,23 @@ void World::load(const std::string &path) {
         std::cout << "File could not open: " << error.what() << std::endl;
         std::cout << "Generating new world instead" << std::endl;
 
-        return World::generate();
+        World::generate();
     }
+
+    ASSERT_ON_GL_ERROR();
+    this->vertex_buffer_objects.resize(this->chunks.size());
+    glGenBuffers(chunks.size(), vertex_buffer_objects.data());
+    for (uint32_t i = 0; i < vertex_buffer_objects.size(); ++i) {
+        glBindVertexArray(this->VAO);
+        glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_objects[i]);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, chunks[i].blocks.data(), GL_STATIC_DRAW);
+
+        glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(Chunk::BlockIDType), (void*)0);
+        glVertexAttribDivisor(2, 1);
+        glEnableVertexAttribArray(2);
+        glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+    ASSERT_ON_GL_ERROR();
 }
 void World::save(const std::string &path) const {
     try {

@@ -13,12 +13,10 @@ frect BlockRect(const BlockType &type) {
     };
 }
 
-
 Chunk::Chunk() {
 }
 
 Chunk::~Chunk() {
-
 }
 
 void Chunk::loop_through(glm::ivec3 &pos) {
