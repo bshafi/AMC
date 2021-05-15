@@ -61,6 +61,8 @@ SDL_Event filter_events(glm::uvec2 &fake_window_bounds, glm::uvec2 &window_bound
 // user.event.data1 is a SceneChangeData pointer which must only be freed by the main thread
 void PushSceneChangeEvent(const SceneChangeData &);
 
-unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::string &fragmentShaderPath);
+uint32_t LoadShaderProgram(const std::string &vertexShaderPath, const std::string &fragmentShaderPath, const std::string &geometry_shader_path = std::string());
 uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *height);
 uint32_t RasterizeText(const std::string &text);
+
+uint32_t LoadCubeMap(const std::string &right, const std::string &left, const std::string &top, const std::string &bottom, const std::string &back, const std::string &front);

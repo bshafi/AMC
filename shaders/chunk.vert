@@ -21,7 +21,6 @@ mat4x4 rotate(vec3 rotation) {
     float b = rotation.y;
     float c = rotation.x;
 
-
     return transpose(mat4x4(
         cos(a) * cos(b), cos(a) * sin(b) * sin(c) - sin(a) * cos(c), cos(a) * sin(b) * cos(c) + sin(a) * sin(c), 0.0f,
         sin(a) * cos(b), sin(a) * sin(b) * sin(c) + cos(a) * cos(c), sin(a) * sin(b) * cos(c) - cos(a) * sin(c), 0.0f,
@@ -40,10 +39,14 @@ mat4x4 translate(vec3 offset) {
 
 void main() {
     ablock_id = block_id;
-
+    /*
     int local_y = gl_InstanceID / 256;
     int local_x = (gl_InstanceID % 256) % 16;
     int local_z = (gl_InstanceID % 256) / 16;
+    */
+    int local_x = gl_InstanceID / 16;
+    int local_y = (gl_InstanceID / 16) % 256;
+    int local_z = ((gl_InstanceID / 16) % 256) / 16;
     ivec3 local_coordinates = ivec3(local_x, local_y, local_z);
 
     vec3 object_pos = 16 * ivec3(chunk_pos.x, 0, chunk_pos.y) + local_coordinates;

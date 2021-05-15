@@ -17,6 +17,7 @@ Chunk::Chunk() {
 }
 
 Chunk::~Chunk() {
+    
 }
 
 void Chunk::loop_through(glm::ivec3 &pos) {
@@ -67,24 +68,24 @@ uint32_t Chunk::world_pos_to_index(glm::ivec3 pos) {
     uint32_t z = mod16(pos.z);
     return (x + 16 * (z + y * 16));
 }
-Chunk::BlockIDType Chunk::GetBlock(glm::ivec3 pos) const {
+BlockType Chunk::GetBlock(glm::ivec3 pos) const {
     assert(MIN_X <= pos.x && pos.x <= MAX_X);
     assert(MIN_Y <= pos.y && pos.y <= MAX_Y);
     assert(MIN_Z <= pos.z && pos.z <= MAX_Z);
 
-    return blocks[world_pos_to_index(pos)];
+    return blocks[pos.x][pos.y][pos.z];
 }
-void Chunk::SetBlock(glm::ivec3 pos, Chunk::BlockIDType id) {
+void Chunk::SetBlock(glm::ivec3 pos, BlockType id) {
     assert(MIN_X <= pos.x && pos.x <= MAX_X);
     assert(MIN_Y <= pos.y && pos.y <= MAX_Y);
     assert(MIN_Z <= pos.z && pos.z <= MAX_Z);
 
-    blocks[world_pos_to_index(pos)] = id;
+    blocks[pos.x][pos.y][pos.z] = id;
 }
 
 bool Chunk::intersects(glm::vec3 pos, AABB aabb) const {
-    glm::vec3 chunk_pos_fvec3 = { this->chunk_pos.x * CHUNK_WIDTH, 0, this->chunk_pos.y * CHUNK_WIDTH };
-    AABB chunk_aabb = { CHUNK_WIDTH, CHUNK_HEIGHT, CHUNK_WIDTH };
+    glm::vec3 chunk_pos_fvec3 = { this->chunk_pos.x * WIDTH, 0, this->chunk_pos.y * WIDTH };
+    AABB chunk_aabb = { WIDTH, HEIGHT, WIDTH };
 
     // Check if the thing intersects the entire chunk in the first place
     if (!AABBIntersection(chunk_pos_fvec3, chunk_aabb, pos, aabb)) {
@@ -98,9 +99,9 @@ bool Chunk::intersects(glm::vec3 pos, AABB aabb) const {
     assert(bottom_left_back.y <= top_right_front.y);
     assert(bottom_left_back.z <= top_right_front.z);
 
-    for (int i = bottom_left_back.x; i <= top_right_front.x; ++i)
+    for (int k = bottom_left_back.z; k <= top_right_front.z; ++k)
         for (int j = bottom_left_back.y; j <= top_right_front.y; ++j)
-            for (int k = bottom_left_back.z; k <= top_right_front.z; ++k) {
+            for (int i = bottom_left_back.x; i <= top_right_front.x; ++i) {
                 const glm::ivec3 checking_pos = glm::ivec3(i, j, k);
                 const glm::vec3 block_pos_world_coords = glm::vec3(checking_pos) + chunk_pos_fvec3;
             

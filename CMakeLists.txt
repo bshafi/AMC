@@ -72,7 +72,8 @@ find_package(OpenAL CONFIG REQUIRED)
 list(APPEND OpenAL::OpenAL)
 
 add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp 
-                    src/standard.cpp src/world.cpp src/chunk.cpp src/player.cpp src/inventory.cpp 
+                    src/standard.cpp src/world.cpp src/player.cpp src/inventory.cpp
+                    src/chunk.cpp
                     src/gui.cpp src/gui_element_visitor.cpp src/tool.cpp src/imgui.cpp src/imgui_widgets.cpp 
                     src/imgui_draw.cpp src/imgui_demo.cpp src/imgui_tables.cpp src/imgui_impl_sdl.cpp
                     src/imgui_impl_opengl3.cpp

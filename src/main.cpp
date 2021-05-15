@@ -8,7 +8,6 @@
 #include "hello_cube.hpp"
 #include "camera.hpp"
 #include "world.hpp"
-#include "chunk.hpp"
 #include "gui.hpp"
 
 #include "imgui.h"
@@ -29,7 +28,7 @@ int main(const int, const char**) {
     world.load("saves/save0.hex");
 
     ASSERT_ON_GL_ERROR();
-    
+
     GUI gui;
     {
         auto *title_background = new Texture("resources/title_image.png");
@@ -60,7 +59,9 @@ int main(const int, const char**) {
 
     uint32_t ticks = SDL_GetTicks();
     bool is_running = true;
+    uint32_t frames = 0;
     std::vector<SDL_Event> events;
+    
     while (is_running) {
         events.clear();
         // TODO: Filter mouse events and window resize events through here
@@ -112,10 +113,10 @@ int main(const int, const char**) {
             if (ImGui::Button("Toggle Debug Mode")) {
                 world.player.toggle_debug_mode(world);
             }
-            {
-                float arr[3] = { world.player.position.x, world.player.position.y, world.player.position.y };
-                ImGui::InputFloat3("position", arr);
-            }
+            float arr[3] = { world.player.position.x, world.player.position.y, world.player.position.y };
+            ImGui::InputFloat3("position", arr);
+            float fps = (static_cast<float>(frames) * 1000.0f) / ticks;
+            ImGui::InputFloat("FPS", &fps);
             ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
             ImGui::End();
         }
@@ -138,6 +139,7 @@ int main(const int, const char**) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
 
+        ++frames;
         uint32_t delta_ticks = SDL_GetTicks() - ticks;
         if (delta_ticks * FPS  < 1000) {
             SDL_Delay(1000 / FPS - delta_ticks);

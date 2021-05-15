@@ -31,10 +31,6 @@ struct Tool;
 
 class Renderer {
 public:
-    //static void draw(const Texture&, const frect &source, const frect &dest, const uint32_t &depth = 0);
-    //static void draw(const frect &, const color &color, const uint32_t &depth = 0);
-    //static void draw(const frect &, const BlockType &block_type, const uint32_t &depth = 0);
-
     template <typename T>
     static void draw(const frect& dest, const uint32_t depth, const T&);
 

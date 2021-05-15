@@ -4,8 +4,16 @@
 #include "gl_helper.hpp"
 #include "shader.hpp"
 
-Shader::Shader(const std::string &vertex, const std::string &fragment) {
-    this->shader_program = LoadShaderProgram(vertex, fragment);
+
+Binding::Binding(const std::string &name, const Texture &tex)
+    : name{ name }, id{ tex.get_id() }, target{ GL_TEXTURE_2D } {
+}
+Binding::Binding(const std::string &name, const CubeMap &cube_map)
+    : name{ name }, id{ cube_map.get_id() }, target{ GL_TEXTURE_CUBE_MAP } {
+}
+
+Shader::Shader(const std::string &vertex, const std::string &fragment, const std::string &geometry) {
+    this->shader_program = LoadShaderProgram(vertex, fragment, geometry);
     ASSERT_ON_GL_ERROR();
     assert(this->shader_program != 0);
 }
@@ -40,14 +48,14 @@ void Shader::use() {
 }
 
 
-void Shader::bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<const Texture>>> &things) {
+void Shader::apply_bindings(const std::vector<Binding> &bindings) {
     // TODO: Remove the magic number 16
-    assert(things.size() <= 16);
+    assert(bindings.size() <= 16);
     unsigned i = 0;
     
     ASSERT_ON_GL_ERROR();
 
-    for (const auto &[name, texture] : things) {
+    for (const auto &[name, id, target] : bindings) {
         this->use();
         int loc = glGetUniformLocation(this->shader_program, name.c_str());
         assert(loc != -1);
@@ -57,7 +65,7 @@ void Shader::bind_texture_to_sampler_2D(const std::vector<std::pair<std::string,
         glUseProgram(0); // Reseting the shader program
 
         glActiveTexture(GL_TEXTURE0 + i);
-        texture.get().bind();
+        glBindTexture(target, id);
         ++i;
 
         ASSERT_ON_GL_ERROR();
@@ -83,21 +91,20 @@ Texture::~Texture() {
     glDeleteTextures(1, &this->id);
 }
 
-Texture::Texture(Texture &&other) {
-    if (this != &other) {
-        glDeleteTextures(1, &this->id);
-        this->id = other.id;
-        this->m_height = other.m_height;
-        this->m_width = other.m_width;
+Texture& Texture::operator=(Texture rhs) {
+    swap(*this, rhs);
+    return *this;
+}
+Texture::Texture(Texture &&other)
+    : id{ 0 }, m_width{ 0 }, m_height{ 0 } {
+    swap(*this, other);
+}
+void swap(Texture &rhs, Texture &lhs) {
+    using std::swap;
 
-        other.id = 0;
-        other.m_height = 0;
-        other.m_width = 0;
-    }
-
-    assert(this->id != 0);
-    assert(m_width != 0);
-    assert(m_height != 0);
+    swap(rhs.id, lhs.id);
+    swap(rhs.m_height, lhs.m_height);
+    swap(rhs.m_width, lhs.m_width);
 }
 
 void Texture::bind() const {
@@ -123,6 +130,32 @@ frect Texture::rect() const {
         static_cast<float>(width()),
         static_cast<float>(height())
     };
+}
+
+
+CubeMap::CubeMap(const std::string &right, const std::string &left, const std::string &top, const std::string &bottom, const std::string &back, const std::string &front) {
+    this->id = LoadCubeMap(right, left, back, bottom, back, front);
+    assert(this->id != 0);
+}
+CubeMap::~CubeMap() {
+    glDeleteTextures(1, &id);
+}
+
+CubeMap& CubeMap::operator=(CubeMap rhs) {
+    swap(*this, rhs);
+    return *this;
+}
+CubeMap::CubeMap(CubeMap &&other)
+    : id{ 0 } {
+    swap(*this, other);
+}
+uint32_t CubeMap::get_id() const {
+    return id;
+}
+void swap(CubeMap &lhs, CubeMap &rhs) {
+    using std::swap;
+
+    swap(lhs.id, rhs.id);
 }
 
 void GLFunctionsWrapper::setuint(int loc, const uint32_t &i) {

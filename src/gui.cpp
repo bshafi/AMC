@@ -82,7 +82,7 @@ void Renderer::draw<Sprite>(const frect &dest, const uint32_t depth, const Sprit
     auto &texture = sprite.texture;
     auto &source = sprite.source;
 
-    shader->bind_texture_to_sampler_2D({
+    shader->apply_bindings({
         { "tex", texture }
     });
     shader->use();

@@ -192,77 +192,118 @@ void PushSceneChangeEvent(const SceneChangeData &_scene_change_data) {
     }
 }
 
-unsigned int LoadShaderProgram(const std::string &vertexShaderPath, const std::string &fragmentShaderPath) {
-    std::ifstream vertexShaderFile(vertexShaderPath), 
-                  fragmentShaderFile(fragmentShaderPath);
-    if (vertexShaderFile.bad() || !vertexShaderFile.is_open()) {
-        if (fragmentShaderFile.bad() || !fragmentShaderFile.is_open()) {
-            throw std::invalid_argument("Could not find files at path " + vertexShaderPath + " or " + fragmentShaderPath);
-        } else {
-            throw std::invalid_argument("Could not find file at path " + vertexShaderPath);
+std::optional<uint32_t> LoadShader(const std::string &shader_path, const uint32_t &type) {
+    assert(type == GL_VERTEX_SHADER || type == GL_FRAGMENT_SHADER || type == GL_GEOMETRY_SHADER);
+
+    std::ifstream shader_file(shader_path);
+    if (shader_file.bad() || !shader_file.is_open()) {
+        std::cout << "File: " << shader_path << " could not be loaded" << std::endl;
+        return std::nullopt;
+    }
+
+    std::string shader_str = std::string(std::istreambuf_iterator<char>(shader_file), std::istreambuf_iterator<char>());
+    const char *shader_source = shader_str.c_str();
+
+    uint32_t shader = glCreateShader(type);
+    glShaderSource(shader, 1, &shader_source, NULL);
+    glCompileShader(shader);
+
+    const uint32_t BUFFER_SIZE = 512;
+    int success;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+    if(!success) {
+        std::string info_log;
+        info_log.resize(BUFFER_SIZE);
+        glGetShaderInfoLog(shader, BUFFER_SIZE, NULL, info_log.data());
+        std::cout << "[";
+        switch (type) {
+        case GL_VERTEX_SHADER:
+            std::cout << "VERTEX";
+            break;
+        case GL_FRAGMENT_SHADER:
+            std::cout << "FRAGMENT";
+            break;
+        case GL_GEOMETRY_SHADER:
+            std::cout << "GEOMETRY";
+            break;
+        default:
+            assert(false);
         }
-    }
-    if (fragmentShaderFile.bad() || !fragmentShaderFile.is_open()) {
-        throw std::invalid_argument("Cound not find file at path " + fragmentShaderPath);
-    }
-
-    // Reads the entire file to string
-    std::string vertexShaderStr = std::string(std::istreambuf_iterator<char>(vertexShaderFile), std::istreambuf_iterator<char>());
-    std::string fragmentShaderStr = std::string(std::istreambuf_iterator<char>(fragmentShaderFile), std::istreambuf_iterator<char>());
-
-    const char *vertexShaderSource = vertexShaderStr.c_str();
-    const char *fragmentShaderSource = fragmentShaderStr.c_str();
-
-    unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-
-    int  success;
-    std::string infoLog;
-    infoLog.resize(512);
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if(!success)
-    {
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog.data());
-        std::cout << "[VERTEX::COMPILATION_FAILED]" << infoLog << std::endl;
+        std::cout << "::COMPILATION_FAILED]" << info_log << std::endl;
+        return std::nullopt;
     }
 
-    unsigned int fragmentShader;
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success)
-    {
-        glGetShaderInfoLog(vertexShader, 512, NULL, infoLog.data());
-        std::cout << "[FRAGMENT::COMPILATION_FAILED]" << infoLog << std::endl;;
-    }
-
-    unsigned int shaderProgram;
-    shaderProgram = glCreateProgram();
-    glAttachShader(shaderProgram, vertexShader);
-    glAttachShader(shaderProgram, fragmentShader);
-    glLinkProgram(shaderProgram);
-    glGetProgramiv(shaderProgram, GL_LINK_STATUS, &success);
-    if(!success)
-    {
-        glGetProgramInfoLog(shaderProgram, 512, NULL, infoLog.data());
-        
-        std::cout << "[PROGRAM::COMPILATION_FAILED]" << infoLog << std::endl;;
-    }
-
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
-    return shaderProgram;
+    return shader;
 }
 
-uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *height) {
-    SDL_Surface *original = IMG_Load(imagePath.c_str());
+unsigned int LoadShaderProgram(const std::string &vertex_shader_path, const std::string &fragment_shader_path, const std::string &geometry_shader_path) {
+    const bool using_geometry_shader = !geometry_shader_path.empty();
+    
+    std::optional<uint32_t> vertex_shader = LoadShader(vertex_shader_path, GL_VERTEX_SHADER);
+    std::optional<uint32_t> fragment_shader = LoadShader(fragment_shader_path, GL_FRAGMENT_SHADER);
+    std::optional<uint32_t> geometry_shader = std::nullopt;
+    if (using_geometry_shader) {
+        geometry_shader = LoadShader(geometry_shader_path, GL_GEOMETRY_SHADER);
+    }
+
+    std::optional<uint32_t> shader_program = std::nullopt;
+    if (
+        vertex_shader.has_value() &&
+        fragment_shader.has_value() &&
+        !(using_geometry_shader && !geometry_shader.has_value())
+    ) {
+        uint32_t program = glCreateProgram();
+        glAttachShader(program, vertex_shader.value());
+        glAttachShader(program, fragment_shader.value());
+        if (using_geometry_shader) {
+            glAttachShader(program, geometry_shader.value());
+        }
+        glLinkProgram(program);
+        int success;
+        glGetProgramiv(program, GL_LINK_STATUS, &success);
+        if(!success) {
+            std::string info_log;
+            info_log.resize(512);
+            glGetProgramInfoLog(program, 512, NULL, info_log.data());
+            
+            std::cout << "[PROGRAM::COMPILATION_FAILED]" << info_log << std::endl;
+            glDeleteProgram(program);
+        } else {
+            shader_program = program;
+        }
+    }
+
+    if (vertex_shader.has_value()) {
+        glDeleteShader(vertex_shader.value());
+    }
+    if (fragment_shader.has_value()) {
+        glDeleteShader(fragment_shader.value());
+    }
+    if (geometry_shader.has_value()) {
+        glDeleteShader(geometry_shader.value());
+    }
+
+    if (!shader_program.has_value()) {
+        throw "Invalid Shader program";
+    }
+
+    return shader_program.value();
+}
+
+SDL_Surface *IMG_LoadRGBA32(const std::string &path) {
+    SDL_Surface *original = IMG_Load(path.c_str());
+    assert(original);
+
     SDL_Surface *modified = SDL_CreateRGBSurfaceWithFormat(0, original->w, original->h, 32, SDL_PIXELFORMAT_RGBA32);
+    assert(modified);
     SDL_BlitSurface(original, nullptr, modified, nullptr);
     SDL_FreeSurface(original);
 
+    return modified;
+}
+
+uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *height) {
+    SDL_Surface *modified = IMG_LoadRGBA32(imagePath);
 
     if (width != nullptr) {
         *width = modified->w;
@@ -286,6 +327,37 @@ uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *heig
 
     return texture;
 
+}
+
+uint32_t LoadCubeMap(const std::string &right, const std::string &left, const std::string &top, const std::string &bottom, const std::string &back, const std::string &front) {
+    const std::array<const std::string, 6> faces = { right, left, top, bottom, back, front };
+
+    ASSERT_ON_GL_ERROR();
+
+    uint32_t tex_id;
+    glGenTextures(1, &tex_id);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, tex_id);
+    for (uint32_t i = 0; i < faces.size(); ++i) {
+        SDL_Surface *surface = IMG_LoadRGBA32(faces[i]);
+        assert(surface);
+
+        glTexImage2D(
+            GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 
+            0, GL_RGB, surface->w, surface->h, 0, GL_RGB, GL_UNSIGNED_BYTE, surface->pixels
+        );
+        ASSERT_ON_GL_ERROR();
+
+        SDL_FreeSurface(surface);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+    ASSERT_ON_GL_ERROR();
+
+    return tex_id;
 }
 
 uint32_t RasterizeText(const std::string &text) {

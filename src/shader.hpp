@@ -61,10 +61,21 @@ private:
 
 struct Sampler2D;
 class Texture;
+class CubeMap;
+
+// This is only temporary don't hold
+struct Binding {
+    Binding(const std::string &name, const Texture &tex);
+    Binding(const std::string &name, const CubeMap &cube_map);
+
+    const std::string name;
+    const uint32_t id;
+    const uint32_t target;
+};
 
 class Shader {
 public:
-    Shader(const std::string &vertex, const std::string &fragment);
+    Shader(const std::string &vertex, const std::string &fragment, const std::string &geometry = std::string());
     Shader();
     ~Shader();
 
@@ -81,12 +92,11 @@ public:
         this->use();
     
         return Uniform<T>(GLFunctionsWrapper::getUniformLocation(shader_program, variable_name));
-
     }
     
     void use();
 
-    void bind_texture_to_sampler_2D(const std::vector<std::pair<std::string, std::reference_wrapper<const Texture>>> &bindings);
+    void apply_bindings(const std::vector<Binding> &bindings);
 
     template <typename T>
     void set(Uniform<T> &uniform, const T &value) {
@@ -115,8 +125,9 @@ public:
     Texture(const std::string &path);
     ~Texture();
 
-    Texture(const Texture&) = delete;
-    Texture(Texture &&other);
+    Texture& operator=(Texture rhs);
+    Texture(Texture &&);
+    friend void swap(Texture &, Texture &);
 
     void bind() const;
 
@@ -130,6 +141,23 @@ private:
     uint32_t id;
     uint32_t m_width, m_height;
 };
+
+class CubeMap {
+public:
+    CubeMap(const std::string &right, const std::string &left, const std::string &top, const std::string &bottom, const std::string &back, const std::string &front);
+    ~CubeMap();
+
+    CubeMap& operator=(CubeMap rhs);
+    CubeMap(CubeMap &&);
+    friend void swap(CubeMap &, CubeMap &);
+
+    void bind() const;
+
+    uint32_t get_id() const;
+private:
+    uint32_t id;
+};
+
 
 
 template <typename T>

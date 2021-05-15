@@ -7,6 +7,33 @@
 #include "standard.hpp"
 
 
+bool array3d_index_in_bounds(const glm::ivec3 &index, const glm::ivec3 &bounds) {
+    return 0 <= index.x && 0 <= index.y && 0 <= index.z && index.x < bounds.x && index.y < bounds.y && index.z < bounds.z;
+}
+
+void array3d_iterate_index(glm::ivec3 &pos, const glm::ivec3 &bounds) {
+    assert(array3d_index_in_bounds(pos, bounds));
+    const uint32_t WidthX = bounds.x;
+    const uint32_t HeightY = bounds.y;
+    const uint32_t LengthZ = bounds.z;
+
+    ++pos.x;
+    if (pos.x >= WidthX) {
+        pos.x = 0;
+        ++pos.y;
+        if (pos.y >= HeightY) {
+            pos.y = 0;
+            ++pos.z;
+            if (pos.z >= LengthZ) {
+                // Do nothing
+            }
+        }
+    }
+
+    // The loop may be out of bounds after the last call of this
+    // assert(array3d_index_in_bounds(pos, arr));
+}
+
 #if SDL_BYTEORDER == SDL_LIL_ENDIAN
     template <>
     uint8_t local_endian_to_big_endian(uint8_t value) {

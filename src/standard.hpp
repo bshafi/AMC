@@ -18,9 +18,21 @@
 template <typename A, typename B>
 using pair_vector = std::vector<std::pair<A, B>>;
 
-template <uint32_t Width, uint32_t Height, typename T>
-using Array2d = std::array<std::array<T, Height>, Width>;
+template <uint32_t WidthX, uint32_t HeightY, typename T>
+using Array2d = std::array<std::array<T, HeightY>, WidthX>;
 
+template <uint32_t WidthX, uint32_t HeightY, uint32_t LengthZ, typename T>
+using Array3d = std::array<std::array<std::array<T, LengthZ>, HeightY>, WidthX>;
+
+
+template <uint32_t WidthX, uint32_t HeightY, uint32_t LengthZ, typename T>
+constexpr glm::ivec3 array3d_bounds(const Array3d<WidthX, HeightY, LengthZ, T> &blocks) {
+    return glm::ivec3(WidthX, HeightY, LengthZ);
+}
+
+bool array3d_index_in_bounds(const glm::ivec3 &index, const glm::ivec3 &bounds);
+
+void array3d_iterate_index(glm::ivec3 &pos, const glm::ivec3 &bounds);
 
 // This forces the static_assert to evaluate on the type argument rather than evaluating
 // all the time

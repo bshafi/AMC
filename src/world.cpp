@@ -7,38 +7,26 @@
 
 #include "world.hpp"
 
+
+void World::destroy_chunks() {
+    glDeleteBuffers(vertex_buffer_objects.size(), vertex_buffer_objects.data());
+    chunks.clear();
+    vertex_buffer_objects.clear();
+}
+
 World::World() : 
     orientation_texture{ "resources/hello_cube_orientation.png" },
     blocks_texture{ "resources/blocks.png" }, 
-    shader{ "shaders/chunk.vert", "shaders/chunk.frag" } {
+    shader{ "shaders/blocks.vert", "shaders/blocks.frag", "shaders/blocks.geom" } {
 
     ASSERT_ON_GL_ERROR();
 
     glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &cube_vertices_VBO);
-    glGenBuffers(1, &block_ids_VBO);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, cube_vertices_VBO); ASSERT_ON_GL_ERROR();
-    glBufferData(GL_ARRAY_BUFFER, sizeof(decltype(cube_vertices)::value_type) * cube_vertices.size(), cube_vertices.data(), GL_STATIC_DRAW); ASSERT_ON_GL_ERROR();
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 5, (void*)0); ASSERT_ON_GL_ERROR();
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 5, (void*)(3 * sizeof(float))); ASSERT_ON_GL_ERROR();
-    glEnableVertexAttribArray(1); ASSERT_ON_GL_ERROR();
-
-    glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, nullptr, GL_DYNAMIC_DRAW);
-
-    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(Chunk::BlockIDType), (void*)0);
-    glVertexAttribDivisor(2, 1);
-    glEnableVertexAttribArray(2);
 
     ASSERT_ON_GL_ERROR();
 
     shader.use();
-    shader.bind_texture_to_sampler_2D({
-        { "orientation", orientation_texture },
+    shader.apply_bindings({
         { "blocks", blocks_texture }
     });
 
@@ -64,9 +52,8 @@ World::~World() {
 
     ASSERT_ON_GL_ERROR();
 
-    glDeleteBuffers(1, &cube_vertices_VBO);
-
-    glDeleteBuffers(1, &globals_3d_ubo);
+    destroy_chunks();
+    glDeleteVertexArrays(1, &VAO);
 
     ASSERT_ON_GL_ERROR();
 }
@@ -178,8 +165,7 @@ void World::draw() {
     
     ASSERT_ON_GL_ERROR();
 
-    shader.bind_texture_to_sampler_2D({
-        { "orientation", orientation_texture },
+    shader.apply_bindings({
         { "blocks", blocks_texture }
     });
 
@@ -190,14 +176,12 @@ void World::draw() {
 
         shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunks[i].chunk_pos);
         
-        glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, chunks[i].blocks.data());
-        
-        //glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_objects[i]);
+        glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_objects[i]);
 
         glBindVertexArray(VAO);
-        glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
-        
+        //glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
+        glDrawArrays(GL_POINTS, 0, vertex_buffer_objects_size[i]);
+
         ASSERT_ON_GL_ERROR();
     }
 
@@ -209,16 +193,16 @@ void World::draw() {
     ASSERT_ON_GL_ERROR();
 }
 
-void World::generate(uint32_t seed) noexcept {
-    this->chunks.clear();
+void World::generate(uint32_t seed) {
+    destroy_chunks();
 
     siv::PerlinNoise noise(seed);
 
     const float frequency = 4.f;
     const int32_t octaves = 4;
 
-    const double fx = (Chunk::CHUNK_WIDTH * 5) / frequency;
-    const double fy = (Chunk::CHUNK_WIDTH * 5) / frequency;
+    const double fx = (Chunk::WIDTH * 5) / frequency;
+    const double fy = (Chunk::WIDTH * 5) / frequency;
 
     for (uint32_t i = 0; i < 5; ++i)
         for (uint32_t j = 0; j < 5; ++j) {
@@ -226,11 +210,11 @@ void World::generate(uint32_t seed) noexcept {
         Chunk &chunk = this->chunks.emplace_back();
 
         for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-            Chunk::BlockIDType block_id = 0;
-            assert(0 <= pos.x && pos.x < Chunk::CHUNK_WIDTH);
-            assert(0 <= pos.z && pos.z < Chunk::CHUNK_WIDTH);
+            BlockType block_id = BlockType::Air;
+            assert(0 <= pos.x && pos.x < Chunk::WIDTH);
+            assert(0 <= pos.z && pos.z < Chunk::WIDTH);
 
-            double r_noise = noise.accumulatedOctaveNoise2D_0_1((pos.x + (i * Chunk::CHUNK_WIDTH))  / fx, (pos.z + (j * Chunk::CHUNK_WIDTH)) / fy, octaves);
+            double r_noise = noise.accumulatedOctaveNoise2D_0_1((pos.x + (i * Chunk::WIDTH))  / fx, (pos.z + (j * Chunk::WIDTH)) / fy, octaves);
             const uint8_t height = static_cast<uint8_t>(std::clamp(r_noise * 128, 0.0, 255.0));
             if (pos.y <= height) {
                 if (pos.y == height) {
@@ -250,7 +234,7 @@ void World::generate(uint32_t seed) noexcept {
 
 
 void World::load(const std::string &path) {
-    this->chunks.clear();
+    destroy_chunks();
     this->save_name = path;
 
     try {
@@ -290,7 +274,9 @@ void World::load(const std::string &path) {
 
             pad16();
             for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-                chunk.SetBlock(pos, read_binary<Chunk::BlockIDType>(file));
+                uint32_t block = read_binary<uint32_t>(file);
+                assert(BLOCK_MIN <= block && block < BLOCK_MAX);
+                chunk.SetBlock(pos, static_cast<BlockType>(block));
             }
             pad16();
         }
@@ -304,18 +290,26 @@ void World::load(const std::string &path) {
     }
 
     ASSERT_ON_GL_ERROR();
+
     this->vertex_buffer_objects.resize(this->chunks.size());
+    this->vertex_buffer_objects_size.resize(this->chunks.size());
     glGenBuffers(chunks.size(), vertex_buffer_objects.data());
+    std::vector<glm::uvec4> data;
     for (uint32_t i = 0; i < vertex_buffer_objects.size(); ++i) {
+        data.clear();
+        gen_chunk_blocks(chunks[i], data);
+        vertex_buffer_objects_size[i] = data.size();
+
         glBindVertexArray(this->VAO);
         glBindBuffer(GL_ARRAY_BUFFER, vertex_buffer_objects[i]);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, chunks[i].blocks.data(), GL_STATIC_DRAW);
 
-        glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(Chunk::BlockIDType), (void*)0);
-        glVertexAttribDivisor(2, 1);
-        glEnableVertexAttribArray(2);
+        glBufferData(GL_ARRAY_BUFFER, data.size(), data.data(), GL_STATIC_DRAW);
+        glVertexAttribIPointer(0, 4, GL_UNSIGNED_INT, sizeof(glm::uvec4), (void*)0);
+        glEnableVertexAttribArray(0);
+
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
+    
     ASSERT_ON_GL_ERROR();
 }
 void World::save(const std::string &path) const {
@@ -359,7 +353,7 @@ void World::save(const std::string &path) const {
             file.flush();
 
             for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos) ;Chunk::loop_through(pos)) {
-                write_binary<Chunk::BlockIDType>(file, this->chunks[i].GetBlock(pos));
+                write_binary<uint32_t>(file, static_cast<uint32_t>(this->chunks[i].GetBlock(pos)));
             }
 
 
@@ -373,3 +367,53 @@ void World::save(const std::string &path) const {
     }
 }
 
+
+void World::gen_chunk_blocks(const Chunk &chunk, std::vector<glm::uvec4> &data) {
+    assert(data.empty());
+
+    const std::array<glm::ivec3, 6> offsets = {
+        glm::ivec3(0, 0, 1),
+        glm::ivec3(0, 1, 0),
+        glm::ivec3(1, 0, 0),
+        glm::ivec3(0, 0, -1),
+        glm::ivec3(0, -1, 0),
+        glm::ivec3(-1, 0, 0),
+    };
+
+    const glm::ivec3 bounds = { Chunk::WIDTH, Chunk::HEIGHT, Chunk::LENGTH };
+    for (glm::ivec3 pos = glm::ivec3(0, 0, 0); 
+        array3d_index_in_bounds(pos, bounds); 
+        array3d_iterate_index(pos, bounds)
+    ) {
+        if (
+            pos.x == 0 || 
+            pos.y == 0 || 
+            pos.z == 0 || 
+            pos.x + 1 == Chunk::WIDTH ||
+            pos.y + 1 == Chunk::HEIGHT ||
+            pos.z + 1 == Chunk::LENGTH
+        ) {
+            data.push_back(glm::uvec4(
+                static_cast<uint32_t>(pos.x),
+                static_cast<uint32_t>(pos.y),
+                static_cast<uint32_t>(pos.z),
+                static_cast<uint32_t>(chunk.GetBlock(pos))
+            ));
+            continue;
+        }
+
+        for (auto offset : offsets) {
+            const glm::ivec3 adjacent_block = offset + pos;
+            BlockType block = chunk.GetBlock(adjacent_block);
+            if (block == BlockType::Air) {
+                data.push_back(glm::uvec4(
+                    static_cast<uint32_t>(pos.x),
+                    static_cast<uint32_t>(pos.y),
+                    static_cast<uint32_t>(pos.z),
+                    static_cast<uint32_t>(chunk.GetBlock(pos))
+                ));
+                break;
+            }
+        }
+    }
+}
