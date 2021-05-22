@@ -88,6 +88,20 @@ bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1) {
            ranges_overlap(pos0.z, aabb0.length, pos1.z, aabb1.length);
 }
 
+
+bool BoundingBox::contains(const glm::vec3 &point) const {
+    const bool x_overlap = (this->pos.x <= point.x) && (point.x <= this->pos.x + this->aabb.width);
+    const bool y_overlap = (this->pos.y <= point.y) && (point.y <= this->pos.y + this->aabb.height);
+    const bool z_overlap = (this->pos.z <= point.z) && (point.z <= this->pos.z + this->aabb.length);
+    return x_overlap && y_overlap && z_overlap;
+}
+
+
+template <>
+bool intersects<BoundingBox, BoundingBox>(const BoundingBox &a, const BoundingBox &b) {
+    return AABBIntersection(a.pos, a.aabb, b.pos, b.aabb);
+}
+
 frect::operator glm::vec4() const {
     return glm::vec4(x, y, w, h);
 }
@@ -161,4 +175,68 @@ std::ostream& operator<<(std::ostream &os, const frect &rect) {
 
 color::operator glm::vec4() const {
     return glm::vec4(r, g, b, a);
+}
+
+template <>
+std::optional<float> Ray::cast(const Plane &plane, const float length) const {
+    const float denominator = glm::dot(direction, plane.normal);
+    if (fabs(denominator) <= 0.0001f) {
+        return std::nullopt;
+    }
+    const float t = glm::dot(plane.offset - endpoint, plane.normal) / denominator;
+    if (t < 0.0f || t > length) {
+        return std::nullopt;
+    } else {
+        return t;
+    }
+}
+template <>
+std::optional<float> Ray::cast(const BoundingBox &box, const float length) const {
+    const glm::vec3 back_bottom_left = box.pos;
+    const glm::vec3 top_front_right = box.pos + glm::vec3(box.aabb.width, box.aabb.height, box.aabb.length);
+
+    const glm::vec3 bbl_t = (back_bottom_left - endpoint) / direction;
+
+    const glm::vec3 tfr_t = (top_front_right - endpoint) / direction;
+
+    const float ts[] = { bbl_t.x, bbl_t.y, bbl_t.z, tfr_t.x, tfr_t.y, tfr_t.z };
+
+    const float ERROR = 0.001f;
+    const BoundingBox loose_box = BoundingBox{
+        .pos = box.pos - glm::vec3(ERROR, ERROR, ERROR), 
+        .aabb = {
+            box.aabb.width + 2 * ERROR,
+            box.aabb.height + 2 * ERROR,
+            box.aabb.length + 2 * ERROR,
+        } 
+    };
+    std::optional<float> t;
+    for (int i = 0; i < 6; ++i) {
+        if (isnan(ts[i]) || isinf(ts[i]) || ts[i] < 0 || ts[i] > length) {
+            continue;
+        }
+        if (loose_box.contains(ts[i] * direction + endpoint)) {
+            if (t.has_value()) {
+                t = std::min(ts[i], *t);
+            } else {
+                t = ts[i];
+            }
+        }
+    }
+
+    return t;
+}
+
+template <>
+bool intersects<Ray, Plane>(const Ray &ray, const Plane &plane) {
+    return ray.cast(plane).has_value();
+}
+
+template <>
+bool intersects<Ray, BoundingBox>(const Ray &ray, const BoundingBox &box) {
+    return ray.cast(box).has_value();
+}
+
+bool Plane::point_in_half_space(const glm::vec3 &pos) const {
+    return glm::dot(offset - pos, normal) >= 0.0f;
 }

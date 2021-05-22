@@ -13,7 +13,7 @@ flat in uint ablock_id;
 
 void main() {
     // Number of blocks implemented
-    uint BLOCK_TYPE_COUNT = 4u;
+    uint BLOCK_TYPE_COUNT = 6u;
 
     // block_id of zero means a empty space
     if (ablock_id == 0u) {
@@ -22,6 +22,6 @@ void main() {
     // This forces glsl to not exclude variables which would make the application crash
     float zero = 0 * (length(outColor) + length(texCoords) + length(texture(orientation, texCoords)) + length(texture(blocks, texCoords)) + float(BLOCK_TYPE_COUNT) + float(ablock_id));
     
-    float tex_y = ((float(BLOCK_TYPE_COUNT) - float(ablock_id) + texCoords.y) / 4);
+    float tex_y = (float(ablock_id - 1) + -texCoords.y + 1) / BLOCK_TYPE_COUNT;
     FragColor = texture(blocks, vec2(texCoords.x, tex_y)) + vec4(0, 0, 0, 0) * zero;
 }

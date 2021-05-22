@@ -1,5 +1,6 @@
 #pragma once
 
+#define GLM_FORCE_EXPLICIT_CTOR
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -84,8 +85,20 @@ struct AABB {
     AABB(float = 0, float = 0, float = 0);
 };
 
+struct BoundingBox {
+    glm::vec3 pos;
+    AABB aabb;
+
+    bool contains(const glm::vec3 &point) const;
+};
+
 // expects that pos is in the bottom back left corner
 bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1);
+
+template <typename A, typename B>
+bool intersects(const A &a, const B &b) {
+    return intersects<B, A>(b, a);
+}
 
 
 struct Handle {
@@ -119,3 +132,14 @@ private:
     uint32_t h_id;
 };
 
+struct Ray {
+    glm::vec3 endpoint = glm::vec3(0, 0, 0), direction = glm::vec3(0, 0, 0);
+
+    template <typename T>
+    std::optional<float> cast(const T&, const float length = std::numeric_limits<float>::infinity()) const;
+};
+
+struct Plane {
+    glm::vec3 normal = glm::vec3(0, 0, 0), offset = glm::vec3(0, 0, 0);
+    bool point_in_half_space(const glm::vec3 &) const;
+};

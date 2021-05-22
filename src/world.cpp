@@ -7,6 +7,11 @@
 
 #include "world.hpp"
 
+
+#include "imgui.h"
+#include "imgui_impl_opengl3.h"
+#include "imgui_impl_sdl.h"
+
 World::World() : 
     orientation_texture{ "resources/hello_cube_orientation.png" },
     blocks_texture{ "resources/blocks.png" }, 
@@ -211,16 +216,21 @@ void World::draw() {
     inventory.draw(frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) }, 0);
 
     ASSERT_ON_GL_ERROR();
+
+    ImGui::Begin("World");
+    ImGui::DragFloat("frequency", &frequency, 1.0f, 10.0f);
+    ImGui::DragInt("octaves", &octaves, 0, 20);
+    if (ImGui::Button("regenerate")) {
+        this->generate();
+    }
+    ImGui::End();
 }
 
 void World::generate(uint32_t seed) noexcept {
     this->chunks.clear();
 
     siv::PerlinNoise noise(seed);
-
-    const float frequency = 4.f;
-    const int32_t octaves = 4;
-
+    
     const double fx = (Chunk::CHUNK_WIDTH * 5) / frequency;
     const double fy = (Chunk::CHUNK_WIDTH * 5) / frequency;
 

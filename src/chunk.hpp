@@ -1,6 +1,6 @@
 #pragma once
 
-#include <glm/glm.hpp>
+#include <limits>
 
 #include "shader.hpp"
 #include "standard.hpp"
@@ -9,7 +9,10 @@ enum BlockType : uint32_t {
     Air = 0,
     Grass = 1,
     Dirt = 2,
-    Stone = 3
+    Stone = 3,
+    Sand = 4,
+    Wood = 5,
+    Leaves = 6,
 };
 
 frect BlockRect(const BlockType &type);
@@ -41,6 +44,11 @@ struct Chunk {
 
     bool intersects(glm::vec3 pos, AABB aabb) const;
 
+    AABB bounding_box() const;
+    glm::vec3 world_pos() const;
+
     Chunk();
     ~Chunk();
 };
+
+BlockType GetBlockFromRay(const std::vector<Chunk> &chunk, const Ray &ray);

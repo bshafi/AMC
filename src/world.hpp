@@ -27,11 +27,12 @@ struct World {
 
 
     std::string save_name;
+    float frequency = 1.f;
+    int32_t octaves = 4;
     
     unsigned int globals_3d_ubo;
 
     static constexpr uint32_t WORLD_VERSION = 1;
-
 
     static const uint32_t DEFAULT_SEED = 0x33333333;
 
