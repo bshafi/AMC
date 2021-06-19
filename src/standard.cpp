@@ -62,14 +62,24 @@
 
     JUST_RETURN_VALUE(uint8_t)
     JUST_RETURN_VALUE(uint32_t)
-    JUST_RETURN_VALUE(int32_t)
     JUST_RETURN_VALUE(uint64_t)
+
+    JUST_RETURN_VALUE(int8_t)
+    JUST_RETURN_VALUE(int32_t)
+    JUST_RETURN_VALUE(int64_t)
 
     #undef JUST_RETURN_VALUE
 #else
 #error "SDL_BYTEORDER not defined"
 #endif
 
+
+float roundup(float x) {
+    return floor(x + 0.001f) + 1;
+}
+glm::vec3 roundup(const glm::vec3 &a) {
+    return glm::vec3(roundup(a.x), roundup(a.y), roundup(a.z));
+}
 
 bool ranges_overlap(float x0, float x0_offset, float x1, float x1_offset) {
     return (x0 <= x1 && x1 <= x0 + x0_offset) || (x0 <= x1 + x1_offset && x1 + x1_offset <= x0 + x0_offset);
@@ -88,7 +98,6 @@ bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1) {
            ranges_overlap(pos0.z, aabb0.length, pos1.z, aabb1.length);
 }
 
-
 bool BoundingBox::contains(const glm::vec3 &point) const {
     const bool x_overlap = (this->pos.x <= point.x) && (point.x <= this->pos.x + this->aabb.width);
     const bool y_overlap = (this->pos.y <= point.y) && (point.y <= this->pos.y + this->aabb.height);
@@ -96,6 +105,16 @@ bool BoundingBox::contains(const glm::vec3 &point) const {
     return x_overlap && y_overlap && z_overlap;
 }
 
+namespace std {
+    static uint32_t i32_to_u32(int32_t x) {
+        return static_cast<uint32_t>(static_cast<int64_t>(x) - static_cast<int64_t>(INT32_MIN));
+    }
+    size_t hash<glm::ivec2>::operator()(const glm::ivec2 &pos) {
+        uint64_t x = i32_to_u32(pos.x); 
+        uint64_t y = i32_to_u32(pos.y);
+        return static_cast<size_t>(x + (y * UINT32_MAX));
+    }
+}
 
 template <>
 bool intersects<BoundingBox, BoundingBox>(const BoundingBox &a, const BoundingBox &b) {
@@ -131,13 +150,27 @@ frect frect::apply_equivalent_transformation(const frect &pre, const frect &post
 frect vec4_to_frect(const glm::vec4 &v) {
     return frect{ v.x, v.y, v.z, v.w };
 }
-frect min_max_scaling(const frect &inner, const frect &outer) {
-    float scale = std::min(outer.w / inner.w, outer.h / inner.h);
-    float new_width = inner.w * scale;
-    float new_height = inner.h * scale;
+
+frect min_max_scaling(const frect &inner, const frect &outer, const VAlignment &valign, const HAlignment &halign) {
+    const float scale = std::min(outer.w / inner.w, outer.h / inner.h);
+    const float new_width = inner.w * scale;
+    const float new_height = inner.h * scale;
+
+    static_assert(static_cast<uint32_t>(VAlignment::Top) == 0);
+    static_assert(static_cast<uint32_t>(VAlignment::Center) == 1);
+    static_assert(static_cast<uint32_t>(VAlignment::Bottom) == 2);
+
+    static_assert(static_cast<uint32_t>(HAlignment::Left) == 0);
+    static_assert(static_cast<uint32_t>(HAlignment::Center) == 1);
+    static_assert(static_cast<uint32_t>(HAlignment::Right) == 2);
+
+    const float new_x = outer.x + static_cast<uint32_t>(halign) * (outer.w - new_width) / 2.0f;
+
+    const float new_y = outer.y + static_cast<uint32_t>(valign) * (outer.h - new_height) / 2.0f;
+
     return frect {
-        outer.x + (outer.w - new_width) / 2.f,
-        outer.y + (outer.h - new_height) / 2.f,
+        new_x,
+        new_y,
         new_width,
         new_height
     };

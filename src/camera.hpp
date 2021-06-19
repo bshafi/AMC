@@ -25,7 +25,7 @@ public:
 private:
     glm::vec3 camera_pos;
     // Note: pitch is up and down while yaw is left and right
-    float _yaw, _pitch;
+    float h_yaw, h_pitch;
 
     static const glm::vec3 UP;
 };

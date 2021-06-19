@@ -62,6 +62,8 @@ int main(const int, const char**) {
     uint32_t ticks = SDL_GetTicks();
     bool is_running = true;
     std::vector<SDL_Event> events;
+    uint32_t delta_ticks;
+    float average_fps = 0.0f;
     while (is_running) {
         events.clear();
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
@@ -127,9 +129,19 @@ int main(const int, const char**) {
             ImGui::InputFloat3("rotation", rotation);
             ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
             if (ImGui::Button("cast ray")) {
-                BlockType block_type = GetBlockFromRay(world.chunks, Ray{ world.player.camera.pos(), world.player.camera.forward() });
-                std::cout << "Block hit " << block_type << std::endl;
+                BlockType *block_type = GetBlockFromRay(world.chunks, Ray{ world.player.camera.pos(), world.player.camera.forward() });
+                std::cout << "Block Hit ";
+                if (block_type != nullptr) {
+                    std::cout << static_cast<uint32_t>(*block_type) << std::endl;
+                } else {
+                    std::cout << "nullptr" << std::endl;
+                }
             }
+            float fps = 1000.f / delta_ticks;
+            ImGui::InputFloat("FPS", &fps);
+            average_fps = 1.25f * fps + (-0.25f) * average_fps;
+            float h_average_fps = average_fps;
+            ImGui::InputFloat("avg FPS", &h_average_fps);
             ImGui::End();
         }
 
@@ -138,9 +150,9 @@ int main(const int, const char**) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
 
-        uint32_t delta_ticks = SDL_GetTicks() - ticks;
+        delta_ticks = SDL_GetTicks() - ticks;
         if (delta_ticks * FPS  < 1000) {
-            SDL_Delay(1000 / FPS - delta_ticks);
+            SDL_Delay((1000 / FPS) - delta_ticks);
         }
         ticks = SDL_GetTicks();
     }

@@ -1,9 +1,6 @@
 cmake_minimum_required(VERSION 3.2)
 set(CMAKE_CXX_STANDARD 17)
 
-set(CMAKE_CXX_COMPILER /usr/local/opt/llvm@12/bin/clang++)
-set(CMAKE_C_COMPILER /usr/local/opt/llvm@12/bin/clang)
-
 include("cmake/HunterGate.cmake")
 
 if (NOT HUNTER_URL AND NOT HUNTER_SHA1)

@@ -23,6 +23,7 @@ public:
     virtual void visit(Inventory &);
 private:
 };
+
 class ConstGUIElementVisitor {
 public:
     void visit(GUIElement * const element, const frect &outer, const uint32_t depth);

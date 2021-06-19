@@ -172,7 +172,7 @@ GUIElement *GUI::HPadding(GUIElement *element, float h_padding) {
     const float other_padding = (1 - 2 * padding) / (1 - padding);
     GUIElement *inner = new HBisection(element, nullptr, other_padding);
     ADD_POINTER(inner);
-    GUIElement *outer = new HBisection( nullptr, inner, padding);
+    GUIElement *outer = new HBisection(nullptr, inner, padding);
     ADD_POINTER(outer);
 
     return outer;
@@ -201,7 +201,6 @@ frect GUIImage::dest_rect(const frect &outer) const {
         dest_rect = outer;
     } else {
         dest_rect = min_max_scaling(this->source, outer);
-        std::cout << "";
     }
 
     return dest_rect;
@@ -269,6 +268,7 @@ Button::Button(Texture &texture, const frect &normal, const frect &on_hover, uin
 void Button::draw(const frect &outer, const uint32_t depth) {
     Renderer::draw(dest_rect(outer), depth, Sprite{ texture, source_rect() });
 }
+
 void Button::handle_events(const SDL_Event &event, const frect &outer, const uint32_t depth) {
     const auto dest_rect = this->dest_rect(outer);
     if (event.type == SDL_MOUSEBUTTONDOWN) {

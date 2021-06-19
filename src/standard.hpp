@@ -22,6 +22,9 @@ using pair_vector = std::vector<std::pair<A, B>>;
 template <uint32_t Width, uint32_t Height, typename T>
 using Array2d = std::array<std::array<T, Height>, Width>;
 
+template <uint32_t Width, uint32_t Height, uint32_t Length, typename T>
+using Array3d = std::array<std::array<std::array<T, Length>, Height>, Width>;
+
 
 // This forces the static_assert to evaluate on the type argument rather than evaluating
 // all the time
@@ -53,6 +56,17 @@ std::ostream& write_binary(std::ostream &os, const T &val) {
     return os.write(reinterpret_cast<char*>(&val_copy), sizeof(T));
 }
 
+namespace std {
+    template <>
+    struct hash<glm::ivec2> {
+        size_t operator()(const glm::ivec2 &pos);
+    };
+}
+
+
+float roundup(float x);
+glm::vec3 roundup(const glm::vec3 &a);
+
 struct frect {
     float x, y, w, h;
 
@@ -64,8 +78,20 @@ struct frect {
     frect apply_equivalent_transformation(const frect &pre, const frect &post) const;
 };
 
+
+enum class VAlignment {
+    Top,
+    Center,
+    Bottom
+};
+enum class HAlignment {
+    Left,
+    Center,
+    Right
+};
+
 frect vec4_to_frect(const glm::vec4 &);
-frect min_max_scaling(const frect &inner, const frect &outer);
+frect min_max_scaling(const frect &inner, const frect &outer, const VAlignment &valign = VAlignment::Center, const HAlignment &halign = HAlignment::Center);
 frect apply_equivalent_transformation(const frect &pre_transform, const frect &post_transform, const frect &inner);
 
 std::ostream& operator<<(std::ostream &, const frect&);
@@ -136,7 +162,7 @@ struct Ray {
     glm::vec3 endpoint = glm::vec3(0, 0, 0), direction = glm::vec3(0, 0, 0);
 
     template <typename T>
-    std::optional<float> cast(const T&, const float length = std::numeric_limits<float>::infinity()) const;
+    std::optional<float> cast(const T&, const float length = 1000.0f) const;
 };
 
 struct Plane {
