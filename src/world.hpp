@@ -1,5 +1,6 @@
 #pragma once
 
+#include "standard.hpp"
 #include "camera.hpp"
 #include "chunk.hpp"
 #include "player.hpp"
@@ -8,7 +9,7 @@
 class Renderer;
 
 struct World {
-    std::vector<Chunk> chunks;
+    std::vector<std::unique_ptr<Chunk>> chunks;
 
     Player player;
     Inventory inventory;

@@ -62,4 +62,4 @@ public:
     glm::vec3 world_pos() const;
 };
 
-BlockType* GetBlockFromRay(std::vector<Chunk> &chunks, const Ray &ray);
+BlockType* GetBlockFromRay(std::vector<std::unique_ptr<Chunk>> &chunks, const Ray &ray);
