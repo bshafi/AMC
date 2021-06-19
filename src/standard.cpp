@@ -62,14 +62,24 @@
 
     JUST_RETURN_VALUE(uint8_t)
     JUST_RETURN_VALUE(uint32_t)
-    JUST_RETURN_VALUE(int32_t)
     JUST_RETURN_VALUE(uint64_t)
+
+    JUST_RETURN_VALUE(int8_t)
+    JUST_RETURN_VALUE(int32_t)
+    JUST_RETURN_VALUE(int64_t)
 
     #undef JUST_RETURN_VALUE
 #else
 #error "SDL_BYTEORDER not defined"
 #endif
 
+
+float roundup(float x) {
+    return floor(x + 0.001f) + 1;
+}
+glm::vec3 roundup(const glm::vec3 &a) {
+    return glm::vec3(roundup(a.x), roundup(a.y), roundup(a.z));
+}
 
 bool ranges_overlap(float x0, float x0_offset, float x1, float x1_offset) {
     return (x0 <= x1 && x1 <= x0 + x0_offset) || (x0 <= x1 + x1_offset && x1 + x1_offset <= x0 + x0_offset);
@@ -86,6 +96,29 @@ bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1) {
     return ranges_overlap(pos0.x,  aabb0.width, pos1.x, aabb1.width) &&
            ranges_overlap(pos0.y, aabb0.height, pos1.y, aabb1.height) &&
            ranges_overlap(pos0.z, aabb0.length, pos1.z, aabb1.length);
+}
+
+bool BoundingBox::contains(const glm::vec3 &point) const {
+    const bool x_overlap = (this->pos.x <= point.x) && (point.x <= this->pos.x + this->aabb.width);
+    const bool y_overlap = (this->pos.y <= point.y) && (point.y <= this->pos.y + this->aabb.height);
+    const bool z_overlap = (this->pos.z <= point.z) && (point.z <= this->pos.z + this->aabb.length);
+    return x_overlap && y_overlap && z_overlap;
+}
+
+namespace std {
+    static uint32_t i32_to_u32(int32_t x) {
+        return static_cast<uint32_t>(static_cast<int64_t>(x) - static_cast<int64_t>(INT32_MIN));
+    }
+    size_t hash<glm::ivec2>::operator()(const glm::ivec2 &pos) {
+        uint64_t x = i32_to_u32(pos.x); 
+        uint64_t y = i32_to_u32(pos.y);
+        return static_cast<size_t>(x + (y * UINT32_MAX));
+    }
+}
+
+template <>
+bool intersects<BoundingBox, BoundingBox>(const BoundingBox &a, const BoundingBox &b) {
+    return AABBIntersection(a.pos, a.aabb, b.pos, b.aabb);
 }
 
 frect::operator glm::vec4() const {
@@ -117,13 +150,27 @@ frect frect::apply_equivalent_transformation(const frect &pre, const frect &post
 frect vec4_to_frect(const glm::vec4 &v) {
     return frect{ v.x, v.y, v.z, v.w };
 }
-frect min_max_scaling(const frect &inner, const frect &outer) {
-    float scale = std::min(outer.w / inner.w, outer.h / inner.h);
-    float new_width = inner.w * scale;
-    float new_height = inner.h * scale;
+
+frect min_max_scaling(const frect &inner, const frect &outer, const VAlignment &valign, const HAlignment &halign) {
+    const float scale = std::min(outer.w / inner.w, outer.h / inner.h);
+    const float new_width = inner.w * scale;
+    const float new_height = inner.h * scale;
+
+    static_assert(static_cast<uint32_t>(VAlignment::Top) == 0);
+    static_assert(static_cast<uint32_t>(VAlignment::Center) == 1);
+    static_assert(static_cast<uint32_t>(VAlignment::Bottom) == 2);
+
+    static_assert(static_cast<uint32_t>(HAlignment::Left) == 0);
+    static_assert(static_cast<uint32_t>(HAlignment::Center) == 1);
+    static_assert(static_cast<uint32_t>(HAlignment::Right) == 2);
+
+    const float new_x = outer.x + static_cast<uint32_t>(halign) * (outer.w - new_width) / 2.0f;
+
+    const float new_y = outer.y + static_cast<uint32_t>(valign) * (outer.h - new_height) / 2.0f;
+
     return frect {
-        outer.x + (outer.w - new_width) / 2.f,
-        outer.y + (outer.h - new_height) / 2.f,
+        new_x,
+        new_y,
         new_width,
         new_height
     };
@@ -161,4 +208,68 @@ std::ostream& operator<<(std::ostream &os, const frect &rect) {
 
 color::operator glm::vec4() const {
     return glm::vec4(r, g, b, a);
+}
+
+template <>
+std::optional<float> Ray::cast(const Plane &plane, const float length) const {
+    const float denominator = glm::dot(direction, plane.normal);
+    if (fabs(denominator) <= 0.0001f) {
+        return std::nullopt;
+    }
+    const float t = glm::dot(plane.offset - endpoint, plane.normal) / denominator;
+    if (t < 0.0f || t > length) {
+        return std::nullopt;
+    } else {
+        return t;
+    }
+}
+template <>
+std::optional<float> Ray::cast(const BoundingBox &box, const float length) const {
+    const glm::vec3 back_bottom_left = box.pos;
+    const glm::vec3 top_front_right = box.pos + glm::vec3(box.aabb.width, box.aabb.height, box.aabb.length);
+
+    const glm::vec3 bbl_t = (back_bottom_left - endpoint) / direction;
+
+    const glm::vec3 tfr_t = (top_front_right - endpoint) / direction;
+
+    const float ts[] = { bbl_t.x, bbl_t.y, bbl_t.z, tfr_t.x, tfr_t.y, tfr_t.z };
+
+    const float ERROR = 0.001f;
+    const BoundingBox loose_box = BoundingBox{
+        .pos = box.pos - glm::vec3(ERROR, ERROR, ERROR), 
+        .aabb = {
+            box.aabb.width + 2 * ERROR,
+            box.aabb.height + 2 * ERROR,
+            box.aabb.length + 2 * ERROR,
+        } 
+    };
+    std::optional<float> t;
+    for (int i = 0; i < 6; ++i) {
+        if (isnan(ts[i]) || isinf(ts[i]) || ts[i] < 0 || ts[i] > length) {
+            continue;
+        }
+        if (loose_box.contains(ts[i] * direction + endpoint)) {
+            if (t.has_value()) {
+                t = std::min(ts[i], *t);
+            } else {
+                t = ts[i];
+            }
+        }
+    }
+
+    return t;
+}
+
+template <>
+bool intersects<Ray, Plane>(const Ray &ray, const Plane &plane) {
+    return ray.cast(plane).has_value();
+}
+
+template <>
+bool intersects<Ray, BoundingBox>(const Ray &ray, const BoundingBox &box) {
+    return ray.cast(box).has_value();
+}
+
+bool Plane::point_in_half_space(const glm::vec3 &pos) const {
+    return glm::dot(offset - pos, normal) >= 0.0f;
 }

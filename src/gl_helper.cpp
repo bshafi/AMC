@@ -75,7 +75,6 @@ SDL_Window *Init_SDL_and_GL() {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glClearColor(135 / 255.f, 206 / 255.f,235 / 255.f, 1.0f);
-
     }
     filter_data.filter_mutex.unlock();
 
@@ -111,7 +110,6 @@ SDL_Window *Init_SDL_and_GL() {
     return window;
 }
 void Quit_SDL_and_GL() {
-
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
@@ -179,8 +177,8 @@ SDL_Event filter_events(glm::uvec2 &fake_window_bounds, glm::uvec2 &window_bound
     }
     return true_event;
 }
-void PushSceneChangeEvent(const SceneChangeData &_scene_change_data) {
-    auto *scene_change_data = new SceneChangeData(_scene_change_data);
+void PushSceneChangeEvent(const SceneChangeData &h_scene_change_data) {
+    auto *scene_change_data = new SceneChangeData(h_scene_change_data);
 
     SDL_Event event;
     SDL_zero(event);

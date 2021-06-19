@@ -7,6 +7,10 @@
 
 #include "world.hpp"
 
+#include "imgui.h"
+#include "imgui_impl_opengl3.h"
+#include "imgui_impl_sdl.h"
+
 World::World() : 
     orientation_texture{ "resources/hello_cube_orientation.png" },
     blocks_texture{ "resources/blocks.png" }, 
@@ -28,9 +32,9 @@ World::World() :
     glEnableVertexAttribArray(1); ASSERT_ON_GL_ERROR();
 
     glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, nullptr, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(BlockType) * Chunk::BLOCKS_IN_CHUNK, nullptr, GL_DYNAMIC_DRAW);
 
-    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(Chunk::BlockIDType), (void*)0);
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(BlockType), (void*)0);
     glVertexAttribDivisor(2, 1);
     glEnableVertexAttribArray(2);
 
@@ -197,7 +201,7 @@ void World::draw() {
         shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunks[i].chunk_pos);
 
         glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(Chunk::BlockIDType) * Chunk::BLOCKS_IN_CHUNK, chunks[i].blocks.data());
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(BlockType) * Chunk::BLOCKS_IN_CHUNK, chunks[i].blocks.data());
 
         glBindVertexArray(VAO);
         glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
@@ -211,16 +215,21 @@ void World::draw() {
     inventory.draw(frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) }, 0);
 
     ASSERT_ON_GL_ERROR();
+
+    ImGui::Begin("World");
+    ImGui::DragFloat("frequency", &frequency, 1.0f, 10.0f);
+    ImGui::DragInt("octaves", &octaves, 0, 20);
+    if (ImGui::Button("regenerate")) {
+        this->generate();
+    }
+    ImGui::End();
 }
 
 void World::generate(uint32_t seed) noexcept {
     this->chunks.clear();
 
     siv::PerlinNoise noise(seed);
-
-    const float frequency = 4.f;
-    const int32_t octaves = 4;
-
+    
     const double fx = (Chunk::CHUNK_WIDTH * 5) / frequency;
     const double fy = (Chunk::CHUNK_WIDTH * 5) / frequency;
 
@@ -230,7 +239,7 @@ void World::generate(uint32_t seed) noexcept {
         Chunk &chunk = this->chunks.emplace_back();
 
         for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-            Chunk::BlockIDType block_id = 0;
+            BlockType block_id = BlockType::Air ;
             assert(0 <= pos.x && pos.x < Chunk::CHUNK_WIDTH);
             assert(0 <= pos.z && pos.z < Chunk::CHUNK_WIDTH);
 
@@ -238,14 +247,14 @@ void World::generate(uint32_t seed) noexcept {
             const uint8_t height = static_cast<uint8_t>(std::clamp(r_noise * 128, 0.0, 255.0));
             if (pos.y <= height) {
                 if (pos.y == height) {
-                    block_id = BlockType::Grass;
+                    block_id = (BlockType::Grass);
                 } else if (pos.y + 4 > height) {
-                    block_id = BlockType::Dirt;
+                    block_id = (BlockType::Dirt);
                 } else {
-                    block_id = BlockType::Stone;
+                    block_id = (BlockType::Stone);
                 }
             }
-            chunk.SetBlock(pos, block_id);
+            chunk.GetBlock(pos) = block_id;
         }
         chunk.chunk_pos = glm::ivec2(i, j);
     }
@@ -294,7 +303,7 @@ void World::load(const std::string &path) {
 
             pad16();
             for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-                chunk.SetBlock(pos, read_binary<Chunk::BlockIDType>(file));
+                chunk.GetBlock(pos) = static_cast<BlockType>(read_binary<uint32_t>(file));
             }
             pad16();
         }
@@ -348,7 +357,7 @@ void World::save(const std::string &path) const {
             file.flush();
 
             for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos) ;Chunk::loop_through(pos)) {
-                write_binary<Chunk::BlockIDType>(file, this->chunks[i].GetBlock(pos));
+                write_binary<uint32_t>(file, static_cast<uint32_t>(this->chunks[i].GetBlock(pos)));
             }
 
 

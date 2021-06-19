@@ -25,8 +25,6 @@ HunterGate(
     SHA1 ${HUNTER_SHA1}
 )
 
-set(CMAKE_CXX_COMPILER /usr/local/opt/llvm@11/bin/clang++)
-
 project(Hope)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -glldb -Wall -Wno-unused-const-variable -Werror -fsanitize=address")
@@ -71,13 +69,19 @@ hunter_add_package(OpenAL)
 find_package(OpenAL CONFIG REQUIRED)
 list(APPEND OpenAL::OpenAL)
 
-add_executable(game src/main.cpp src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp 
-                    src/standard.cpp src/world.cpp src/chunk.cpp src/player.cpp src/inventory.cpp 
-                    src/gui.cpp src/gui_element_visitor.cpp src/tool.cpp src/imgui.cpp src/imgui_widgets.cpp 
-                    src/imgui_draw.cpp src/imgui_demo.cpp src/imgui_tables.cpp src/imgui_impl_sdl.cpp
-                    src/imgui_impl_opengl3.cpp
+list(APPEND CPP_FILES
+  src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp 
+  src/standard.cpp src/world.cpp src/chunk.cpp src/player.cpp src/inventory.cpp 
+  src/gui.cpp src/gui_element_visitor.cpp src/tool.cpp src/imgui.cpp src/imgui_widgets.cpp 
+  src/imgui_draw.cpp src/imgui_demo.cpp src/imgui_tables.cpp src/imgui_impl_sdl.cpp
+  src/imgui_impl_opengl3.cpp
 )
+
+add_executable(game src/main.cpp ${CPP_FILES})
 target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
+
+add_executable(test src/test.cpp ${CPP_FILES})
+target_link_libraries(test PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
 
 string(TIMESTAMP CURRENT_DATE_TIME "%Y_%m_%d_%H_%M_%S")
 

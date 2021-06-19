@@ -41,9 +41,9 @@ mat4x4 translate(vec3 offset) {
 void main() {
     ablock_id = block_id;
 
-    int local_y = gl_InstanceID / 256;
-    int local_x = (gl_InstanceID % 256) % 16;
-    int local_z = (gl_InstanceID % 256) / 16;
+    int local_x = gl_InstanceID / (16 * 256);
+    int local_y = (gl_InstanceID % (16 * 256)) / 16;
+    int local_z = (gl_InstanceID % (16 * 256)) % 16;
     ivec3 local_coordinates = ivec3(local_x, local_y, local_z);
 
     vec3 object_pos = 16 * ivec3(chunk_pos.x, 0, chunk_pos.y) + local_coordinates;

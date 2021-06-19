@@ -48,3 +48,4 @@ backup/*
 local/*
 LatestGate.json
 hunter-v0.23.296.tar.gz
+src/camera.hpp

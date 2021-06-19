@@ -8,7 +8,7 @@
 
 const glm::vec3 Camera::UP = glm::vec3(0, 1, 0);
 
-Camera::Camera(glm::vec3 camera_pos) : camera_pos{camera_pos}, _yaw{-M_PI_2}, _pitch{0.0f} {
+Camera::Camera(glm::vec3 camera_pos) : camera_pos{camera_pos}, h_yaw{-M_PI_2}, h_pitch{0.0f} {
 
 }
 
@@ -25,9 +25,9 @@ glm::mat4x4 Camera::view_matrix() const {
 
 glm::vec3 Camera::forward() const {
     return glm::normalize(glm::vec3(
-        cos(_yaw) * cos(_pitch),
-        sin(_pitch),
-        sin(_yaw) * cos(_pitch)
+        cos(h_yaw) * cos(h_pitch),
+        sin(h_pitch),
+        sin(h_yaw) * cos(h_pitch)
     ));
 }
 glm::vec3 Camera::right() const {
@@ -38,22 +38,22 @@ glm::vec3 Camera::up() const {
 }
 
 void Camera::rotate_upwards(float f) {
-    _pitch += f;
+    h_pitch += f;
 }
 void Camera::rotate_right(float f) {
-    _yaw += f;
+    h_yaw += f;
 }
 
 void Camera::pitch(float p) {
-    _pitch = p;
+    h_pitch = p;
 }
 float Camera::pitch() const {
-    return _pitch;
+    return h_pitch;
 }
 
 void Camera::yaw(float y) {
-    _yaw = y;
+    h_yaw = y;
 }
 float Camera::yaw() const {
-    return _yaw;
+    return h_yaw;
 }

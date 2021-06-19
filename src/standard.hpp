@@ -1,5 +1,6 @@
 #pragma once
 
+#define GLM_FORCE_EXPLICIT_CTOR
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -20,6 +21,9 @@ using pair_vector = std::vector<std::pair<A, B>>;
 
 template <uint32_t Width, uint32_t Height, typename T>
 using Array2d = std::array<std::array<T, Height>, Width>;
+
+template <uint32_t Width, uint32_t Height, uint32_t Length, typename T>
+using Array3d = std::array<std::array<std::array<T, Length>, Height>, Width>;
 
 
 // This forces the static_assert to evaluate on the type argument rather than evaluating
@@ -52,6 +56,17 @@ std::ostream& write_binary(std::ostream &os, const T &val) {
     return os.write(reinterpret_cast<char*>(&val_copy), sizeof(T));
 }
 
+namespace std {
+    template <>
+    struct hash<glm::ivec2> {
+        size_t operator()(const glm::ivec2 &pos);
+    };
+}
+
+
+float roundup(float x);
+glm::vec3 roundup(const glm::vec3 &a);
+
 struct frect {
     float x, y, w, h;
 
@@ -63,8 +78,20 @@ struct frect {
     frect apply_equivalent_transformation(const frect &pre, const frect &post) const;
 };
 
+
+enum class VAlignment {
+    Top,
+    Center,
+    Bottom
+};
+enum class HAlignment {
+    Left,
+    Center,
+    Right
+};
+
 frect vec4_to_frect(const glm::vec4 &);
-frect min_max_scaling(const frect &inner, const frect &outer);
+frect min_max_scaling(const frect &inner, const frect &outer, const VAlignment &valign = VAlignment::Center, const HAlignment &halign = HAlignment::Center);
 frect apply_equivalent_transformation(const frect &pre_transform, const frect &post_transform, const frect &inner);
 
 std::ostream& operator<<(std::ostream &, const frect&);
@@ -84,8 +111,20 @@ struct AABB {
     AABB(float = 0, float = 0, float = 0);
 };
 
+struct BoundingBox {
+    glm::vec3 pos;
+    AABB aabb;
+
+    bool contains(const glm::vec3 &point) const;
+};
+
 // expects that pos is in the bottom back left corner
 bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1);
+
+template <typename A, typename B>
+bool intersects(const A &a, const B &b) {
+    return intersects<B, A>(b, a);
+}
 
 
 struct Handle {
@@ -119,3 +158,14 @@ private:
     uint32_t h_id;
 };
 
+struct Ray {
+    glm::vec3 endpoint = glm::vec3(0, 0, 0), direction = glm::vec3(0, 0, 0);
+
+    template <typename T>
+    std::optional<float> cast(const T&, const float length = 1000.0f) const;
+};
+
+struct Plane {
+    glm::vec3 normal = glm::vec3(0, 0, 0), offset = glm::vec3(0, 0, 0);
+    bool point_in_half_space(const glm::vec3 &) const;
+};

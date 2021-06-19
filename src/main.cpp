@@ -27,6 +27,7 @@ int main(const int, const char**) {
     GameState state = GameState::TitleScreen;
     World world;
     world.load("saves/save0.hex");
+    world.player.set_position(glm::vec3(0, 66, 0));
 
     ASSERT_ON_GL_ERROR();
     
@@ -61,31 +62,27 @@ int main(const int, const char**) {
     uint32_t ticks = SDL_GetTicks();
     bool is_running = true;
     std::vector<SDL_Event> events;
+    uint32_t delta_ticks;
+    float average_fps = 0.0f;
     while (is_running) {
         events.clear();
-        // TODO: Filter mouse events and window resize events through here
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
             ImGui_ImplSDL2_ProcessEvent(&event);
             switch (event.type) {
             case SDL_QUIT: 
                 is_running = false;
                 break;
-            case SDL_KEYDOWN:
-                if (event.key.keysym.scancode == SDL_SCANCODE_Q) {
-                    
-                }
-                break;
             default:
                 if (event.type == SCENE_CHANGE_EVENT) {
                     SceneChangeData *scd = static_cast<SceneChangeData*>(event.user.data1);
                     assert(scd);
-
                     delete scd;
                 }
             break;
             }
             events.push_back(event);
         }
+
         switch (state) {
         case GameState::TitleScreen:
             gui.handle_events(events);
@@ -105,20 +102,10 @@ int main(const int, const char**) {
         ImGui_ImplSDL2_NewFrame(window);
         ImGui::NewFrame();
 
-        ASSERT_ON_GL_ERROR();
-
-        {
-            ImGui::Begin("Configurations");
-            if (ImGui::Button("Toggle Debug Mode")) {
-                world.player.toggle_debug_mode(world);
-            }
-            ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
-            ImGui::End();
-        }
-
-        ImGui::Render();
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+        ASSERT_ON_GL_ERROR();
+
         switch (state) {
         case GameState::TitleScreen:
             gui.draw();
@@ -131,12 +118,41 @@ int main(const int, const char**) {
             break;
         }
 
+        {
+            ImGui::Begin("Configurations");
+            if (ImGui::Button("Toggle Debug Mode")) {
+                world.player.toggle_debug_mode(world);
+            }
+            float position[3] = { world.player.position.x, world.player.position.y, world.player.position.z };
+            ImGui::InputFloat3("position", position);
+            float rotation[3] = { world.player.camera.pitch(), world.player.camera.yaw(), 0 };
+            ImGui::InputFloat3("rotation", rotation);
+            ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
+            if (ImGui::Button("cast ray")) {
+                BlockType *block_type = GetBlockFromRay(world.chunks, Ray{ world.player.camera.pos(), world.player.camera.forward() });
+                std::cout << "Block Hit ";
+                if (block_type != nullptr) {
+                    std::cout << static_cast<uint32_t>(*block_type) << std::endl;
+                } else {
+                    std::cout << "nullptr" << std::endl;
+                }
+            }
+            float fps = 1000.f / delta_ticks;
+            ImGui::InputFloat("FPS", &fps);
+            average_fps = 1.25f * fps + (-0.25f) * average_fps;
+            float h_average_fps = average_fps;
+            ImGui::InputFloat("avg FPS", &h_average_fps);
+            ImGui::End();
+        }
+
+        ImGui::Render();
+        
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(window);
 
-        uint32_t delta_ticks = SDL_GetTicks() - ticks;
+        delta_ticks = SDL_GetTicks() - ticks;
         if (delta_ticks * FPS  < 1000) {
-            SDL_Delay(1000 / FPS - delta_ticks);
+            SDL_Delay((1000 / FPS) - delta_ticks);
         }
         ticks = SDL_GetTicks();
     }
