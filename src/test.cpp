@@ -1,15 +1,18 @@
 #include "standard.hpp"
 #include "chunk.hpp"
 
+#include "test.hpp"
+
 void TestRayCast();
 void TestBlockIndexing();
 
 int main() {
-    TestRayCast();
-    TestBlockIndexing();
+    for (auto fn : Testing::tests()) {
+        fn();
+    }
 }
 
-void TestRayCast() {
+REGISTER_TEST(TestRayCast) {
     Chunk chunk;
     for (int i = 0; i < 10; ++i) {
         chunk.GetBlock(glm::ivec3(i, 0, 0)) = BlockType::Stone;
@@ -17,18 +20,21 @@ void TestRayCast() {
     Ray ray = { glm::vec3(0, -10, 0) , glm::normalize(glm::vec3(0, 1, 0)) };
     auto hit = ray.cast(chunk, 10);
     if (hit.has_value()) {
-        std::cout << *hit << std::endl;
-        const glm::vec3 thing = (*hit) * ray.direction + ray.endpoint;
-        std::cout << thing.x << ", " << thing.y << ", " << thing.z << std::endl;
-        std::cout << static_cast<uint32_t>(chunk.GetBlock(glm::ivec3((*hit) * ray.direction + ray.endpoint)));
+        BlockType block_type = chunk.GetBlock(glm::ivec3((*hit) * ray.direction + ray.endpoint));
+        if (block_type != BlockType::Stone) {
+            std::cout << *hit << std::endl;
+            const glm::vec3 thing = (*hit) * ray.direction + ray.endpoint;
+            std::cout << thing.x << ", " << thing.y << ", " << thing.z << std::endl;
+            std::cout << static_cast<uint32_t>(block_type);
+        }
     } else {
         std::cout << "nullopt" << std::endl;
     }
-
 }
 
 glm::ivec3 to_loc(uint32_t pos);
-void TestBlockIndexing() {
+
+REGISTER_TEST(TestBlockIndexing) {
     Chunk chunk;
     uint32_t error_count = 0;
     uintptr_t start = reinterpret_cast<uintptr_t>(&chunk.GetBlock(glm::ivec3(0, 0, 0)));

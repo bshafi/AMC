@@ -129,10 +129,11 @@ int main(const int, const char**) {
             ImGui::InputFloat3("rotation", rotation);
             ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
             if (ImGui::Button("cast ray")) {
-                BlockType *block_type = GetBlockFromRay(world.chunks, Ray{ world.player.camera.pos(), world.player.camera.forward() });
+                std::optional<BlockHit> block_type = world.GetBlockFromRay(Ray{ world.player.camera.pos(), world.player.camera.forward() });
                 std::cout << "Block Hit ";
-                if (block_type != nullptr) {
-                    std::cout << static_cast<uint32_t>(*block_type) << std::endl;
+                if (block_type != std::nullopt) {
+                    std::cout << static_cast<uint32_t>(world.GetBlock(*block_type)) << std::endl;
+                    std::cout << get_face_name(block_type->face) << std::endl;
                 } else {
                     std::cout << "nullptr" << std::endl;
                 }

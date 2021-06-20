@@ -109,10 +109,10 @@ namespace std {
     static uint32_t i32_to_u32(int32_t x) {
         return static_cast<uint32_t>(static_cast<int64_t>(x) - static_cast<int64_t>(INT32_MIN));
     }
-    size_t hash<glm::ivec2>::operator()(const glm::ivec2 &pos) {
+    size_t hash<glm::ivec2>::operator()(const glm::ivec2 &pos) const {
         uint64_t x = i32_to_u32(pos.x); 
         uint64_t y = i32_to_u32(pos.y);
-        return static_cast<size_t>(x + (y * UINT32_MAX));
+        return static_cast<size_t>((x << 32) | (y));
     }
 }
 
