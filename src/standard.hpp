@@ -11,6 +11,7 @@
 #include <vector>
 #include <variant>
 #include <map>
+#include <unordered_map>
 #include <optional>
 #include <iostream>
 
@@ -59,7 +60,7 @@ std::ostream& write_binary(std::ostream &os, const T &val) {
 namespace std {
     template <>
     struct hash<glm::ivec2> {
-        size_t operator()(const glm::ivec2 &pos);
+        size_t operator()(const glm::ivec2 &pos) const;
     };
 }
 

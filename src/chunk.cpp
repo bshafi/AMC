@@ -296,23 +296,6 @@ std::optional<float> Ray::cast(const Chunk &chunk, const float length) const {
     return t;
 }
 
-BlockType* GetBlockFromRay(std::vector<std::unique_ptr<Chunk>> &chunks, const Ray &ray) {
-    float min_t = std::numeric_limits<float>::infinity();
-    BlockType *block = nullptr;
-    glm::ivec3 location;
-    for (auto &chunk : chunks) {
-        std::optional<float> hit = ray.cast(*chunk, 100.0f);
-        if (!hit.has_value()) {
-            continue;
-        }
-        glm::vec3 hit_pos = (*hit) * ray.direction + ray.endpoint;
-        location = get_hit_block(*chunk, ray.direction, hit_pos);
-        assert(chunk_contains(*chunk, location));
-        BlockType &h_block = chunk->GetBlock(location);
-        if ((*hit) < min_t) {
-            min_t = *hit;
-            block = &h_block;
-        }
-    }
-    return block;
+const char *get_face_name(BlockHit::Face face) {
+    return face_names[static_cast<uint32_t>(face)];
 }

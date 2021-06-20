@@ -6,6 +6,7 @@
 #include "hello_cube.hpp"
 
 #include "world.hpp"
+#include "chunk.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -60,6 +61,8 @@ World::World() :
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
     ASSERT_ON_GL_ERROR();
+
+    selected_block_damage = BLOCK_DURABILITY;
 }
 World::~World() {
     this->save(save_name);
@@ -118,7 +121,7 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
                 SDL_SetRelativeMouseMode(SDL_TRUE);
             }
             if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-                
+
             }
             if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
                 SDL_SetRelativeMouseMode(SDL_FALSE);
@@ -156,11 +159,39 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
         }
     }
     player.apply_gravity(*this);
+
+    const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
+    if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
+        std::cout << (rand() % 2 ? '1' : '0')  << std::endl;
+        auto new_block = GetBlockFromRay(Ray{ .endpoint = player.position/*player.camera.pos() + glm::vec3(0.5f, 1.5f, 0.5f)*/, .direction = player.camera.forward() });
+        if (selected_block == std::nullopt) {
+            if (new_block != std::nullopt) {
+                std::cout << new_block->block_pos.x << ", " << new_block->block_pos.y << ", " << new_block->block_pos.z << std::endl;
+            }
+            this->selected_block = new_block;
+            selected_block_damage = BLOCK_DURABILITY;
+        } else if (new_block == std::nullopt) {
+        } else {
+            if (
+                new_block->chunk_pos == selected_block->chunk_pos && 
+                new_block->block_pos == selected_block->block_pos
+            ) {
+                this->selected_block = new_block;
+                selected_block_damage -= BLOCK_DURABILITY / FPS;
+                if (selected_block_damage < 0) {
+                    SetBlock(*selected_block, BlockType::Air);
+                }
+            } else {
+                this->selected_block = new_block;
+                selected_block_damage = BLOCK_DURABILITY;
+            }
+        }
+    }
 }
 
 bool World::intersects_block(const glm::vec3 &pos, const AABB &aabb) const {
-    for (const auto &chunk : this->chunks) {
-        if (chunk->intersects(pos, aabb)) {
+    for (const auto &[chunk_pos, chunk] : this->chunks) {
+        if (chunk.intersects(pos, aabb)) {
             return true;
         }
     }
@@ -176,6 +207,72 @@ glm::vec3 World::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, c
         }
     }
     return new_pos;
+}
+
+BlockHit::Face get_hit_face(const glm::vec3 &hit_pos, const glm::ivec3 &block_location) {
+        const glm::vec3 world_location = glm::vec3(block_location) + 0.5f * glm::vec3(1, 1, 1);
+        const glm::vec3 hit_offset = hit_pos - world_location;
+        int max_dir = 0;
+        if (fabs(hit_offset[max_dir]) < fabs(hit_offset.y)) {
+            max_dir = 1;
+        }
+        if (fabs(hit_offset[max_dir]) < fabs(hit_offset.z)) {
+            max_dir = 2;
+        }
+        switch (max_dir) {
+        case 0: {
+                if (hit_offset.x < 0) {
+                    return BlockHit::Face::NegX;
+                } else {
+                    return BlockHit::Face::PosX;
+                }
+            }
+            break;
+        case 1: {
+                if (hit_offset.y < 0) {
+                    return BlockHit::Face::NegY;
+                } else {
+                    return BlockHit::Face::PosY;
+                }
+            }
+            break;
+        case 2: {
+                if (hit_offset.z < 0) {
+                    return BlockHit::Face::NegZ;
+                } else {
+                    return BlockHit::Face::PosZ;
+                }
+            }
+            break;
+        default:
+            assert(false);
+        }
+}
+
+std::optional<BlockHit> World::GetBlockFromRay(const Ray &ray) {
+    float min_t = std::numeric_limits<float>::infinity();
+    std::optional<BlockHit> block = std::nullopt;
+    glm::ivec3 location;
+    for (auto &[chunk_pos, chunk] : chunks) {
+        std::optional<float> hit = ray.cast(chunk, 100.0f);
+        if (!hit.has_value()) {
+            continue;
+        }
+        glm::vec3 hit_pos = (*hit) * ray.direction + ray.endpoint;
+        location = get_hit_block(chunk, ray.direction, hit_pos);
+        assert(chunk_contains(chunk, location));
+        if ((*hit) < min_t) {
+            min_t = *hit;
+            block = BlockHit{ chunk_pos, location, get_hit_face(hit_pos, location) };
+        }
+    }
+    return block;
+}
+BlockType World::GetBlock(const BlockHit &block_handle) {
+    return chunks[block_handle.chunk_pos].GetBlock(block_handle.block_pos);
+}
+void World::SetBlock(const BlockHit &block_handle, BlockType type) {
+    chunks[block_handle.chunk_pos].GetBlock(block_handle.block_pos) = type;
 }
 
 void World::draw() {
@@ -195,13 +292,13 @@ void World::draw() {
 
     shader.use();
 
-    for (uint32_t i = 0; i < chunks.size(); ++i) {
+    for (auto &[chunk_pos, chunk] : chunks) {
         ASSERT_ON_GL_ERROR();
 
-        shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunks[i]->chunk_pos);
+        shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
 
         glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(BlockType) * Chunk::BLOCKS_IN_CHUNK, chunks[i]->blocks.data());
+        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(BlockType) * Chunk::BLOCKS_IN_CHUNK, chunk.blocks.data());
 
         glBindVertexArray(VAO);
         glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
@@ -236,7 +333,8 @@ void World::generate(uint32_t seed) noexcept {
     for (uint32_t i = 0; i < 5; ++i)
         for (uint32_t j = 0; j < 5; ++j) {
         
-        std::unique_ptr<Chunk> &chunk = chunks.emplace_back(std::make_unique<Chunk>());
+        //std::unique_ptr<Chunk> &chunk = chunks.emplace_back(std::make_unique<Chunk>());
+        Chunk chunk;
 
         for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
             BlockType block_id = BlockType::Air ;
@@ -254,9 +352,10 @@ void World::generate(uint32_t seed) noexcept {
                     block_id = (BlockType::Stone);
                 }
             }
-            chunk->GetBlock(pos) = block_id;
+            chunk.GetBlock(pos) = block_id;
         }
-        chunk->chunk_pos = glm::ivec2(i, j);
+        chunk.chunk_pos = glm::ivec2(i, j);
+        chunks.emplace(std::make_pair<glm::ivec2, Chunk>(glm::ivec2(chunk.chunk_pos), std::move(chunk)));
     }
 }
 
@@ -280,7 +379,7 @@ void World::load(const std::string &path) {
         assert(version == World::WORLD_VERSION);
         const uint32_t chunks_count = read_binary<uint32_t>(file);
 
-        this->chunks.reserve(chunks_count);
+        //this->chunks.reserve(chunks_count);
         std::vector<uint32_t> chunk_positions;
         chunk_positions.reserve(chunks_count);
 
@@ -291,21 +390,23 @@ void World::load(const std::string &path) {
         pad16();
 
         for (uint32_t i = 0; i < chunks_count; ++i) {
-            std::unique_ptr<Chunk> &chunk = this->chunks.emplace_back(std::make_unique<Chunk>());
+            //std::unique_ptr<Chunk> &chunk = this->chunks.emplace_back(std::make_unique<Chunk>());
+            Chunk chunk;
             file.seekg(chunk_positions[i], std::ios_base::beg);
 
             const int32_t chunk_pos_x = read_binary<int32_t>(file);
             const int32_t chunk_pos_y = read_binary<int32_t>(file);
-            chunk->chunk_pos = glm::ivec2(chunk_pos_x, chunk_pos_y);
+            chunk.chunk_pos = glm::ivec2(chunk_pos_x, chunk_pos_y);
 
             const uint64_t blocks_in_chunk = read_binary<uint64_t>(file);
             assert(blocks_in_chunk == Chunk::BLOCKS_IN_CHUNK);
 
             pad16();
             for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-                chunk->GetBlock(pos) = static_cast<BlockType>(read_binary<uint32_t>(file));
+                chunk.GetBlock(pos) = static_cast<BlockType>(read_binary<uint32_t>(file));
             }
             pad16();
+            chunks.emplace(std::make_pair<glm::ivec2, Chunk>(glm::ivec2(chunk.chunk_pos), std::move(chunk)));
         }
 
         file.close();
@@ -339,29 +440,31 @@ void World::save(const std::string &path) const {
         }
 
         pad16();
+        {
+            uint32_t i = 0;
+            for (const auto &[chunk_pos, chunk] : chunks) {
+                const uint32_t curr_chunk_pos = file.tellp();
+                file.seekp(chunk_pos_start + i * sizeof(uint32_t), std::ios_base::beg);
+                write_binary<uint32_t>(file, curr_chunk_pos);
+                file.seekp(curr_chunk_pos, std::ios_base::beg);
 
-        for (uint32_t i = 0; i < this->chunks.size(); ++i) {
-            const uint32_t curr_chunk_pos = file.tellp();
-            file.seekp(chunk_pos_start + i * sizeof(uint32_t), std::ios_base::beg);
-            write_binary<uint32_t>(file, curr_chunk_pos);
-            file.seekp(curr_chunk_pos, std::ios_base::beg);
+                write_binary<int32_t>(file, chunk.chunk_pos.x);
+                write_binary<int32_t>(file, chunk.chunk_pos.y);
+                write_binary<uint64_t>(file, Chunk::BLOCKS_IN_CHUNK);
 
-            write_binary<int32_t>(file, chunks[i]->chunk_pos.x);
-            write_binary<int32_t>(file, chunks[i]->chunk_pos.y);
-            write_binary<uint64_t>(file, Chunk::BLOCKS_IN_CHUNK);
+                file.flush();
 
-            file.flush();
+                pad16();
 
-            pad16();
+                file.flush();
 
-            file.flush();
+                for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos) ;Chunk::loop_through(pos)) {
+                    write_binary<uint32_t>(file, static_cast<uint32_t>(chunk.GetBlock(pos)));
+                }
 
-            for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos) ;Chunk::loop_through(pos)) {
-                write_binary<uint32_t>(file, static_cast<uint32_t>(this->chunks[i]->GetBlock(pos)));
+                pad16();
+                ++i;
             }
-
-
-            pad16();
         }
 
         file.close();
@@ -370,4 +473,5 @@ void World::save(const std::string &path) const {
         std::cout << "File could not be written to: " << error.what() << std::endl;
     }
 }
+
 

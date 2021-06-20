@@ -62,4 +62,37 @@ public:
     glm::vec3 world_pos() const;
 };
 
-BlockType* GetBlockFromRay(std::vector<std::unique_ptr<Chunk>> &chunks, const Ray &ray);
+bool chunk_contains(const Chunk &chunk, const glm::ivec3 &pos);
+bool min_nonegative(float a, float b);
+glm::ivec3 get_hit_block(const Chunk &chunk, const glm::vec3 &dir, const glm::vec3 &hit_pos);
+
+struct BlockHit {
+    glm::ivec2 chunk_pos = { 0, 0 };
+    glm::ivec3 block_pos = { 0, 0, 0 };
+    enum class Face {
+        Top = 0,
+        PosY = Top,
+        Bottom = 1,
+        NegY = Bottom,
+        Right = 2,
+        PosX = Right,
+        Left = 3,
+        NegX = Left,
+        Front = 4,
+        PosZ = Front,
+        Back = 5,
+        NegZ = Back
+    };
+    // Normal of the face of the block that was hit
+    Face face;
+};
+
+const char *get_face_name(BlockHit::Face face);
+constexpr const char *face_names[] = {
+    "PosY",
+    "NegY",
+    "PosX",
+    "NegX",
+    "PosZ",
+    "NegZ"
+};
