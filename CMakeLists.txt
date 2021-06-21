@@ -69,6 +69,10 @@ hunter_add_package(OpenAL)
 find_package(OpenAL CONFIG REQUIRED)
 list(APPEND OpenAL::OpenAL)
 
+hunter_add_package(GTest)
+find_package(GTest CONFIG REQUIRED)
+list(APPEND TEMP_LIBRARIES GTest::gtest)
+
 list(APPEND CPP_FILES
   src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp 
   src/standard.cpp src/world.cpp src/chunk.cpp src/player.cpp src/inventory.cpp 
@@ -80,7 +84,7 @@ list(APPEND CPP_FILES
 add_executable(game src/main.cpp ${CPP_FILES})
 target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
 
-add_executable(test src/test.cpp ${CPP_FILES})
+add_executable(test tests/test.cpp ${CPP_FILES})
 target_link_libraries(test PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
 
 string(TIMESTAMP CURRENT_DATE_TIME "%Y_%m_%d_%H_%M_%S")

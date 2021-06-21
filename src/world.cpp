@@ -162,7 +162,7 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
 
     const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
     if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-        std::cout << (rand() % 2 ? '1' : '0')  << std::endl;
+        //std::cout << (rand() % 2 ? '1' : '0')  << std::endl;
         auto new_block = GetBlockFromRay(Ray{ .endpoint = player.position/*player.camera.pos() + glm::vec3(0.5f, 1.5f, 0.5f)*/, .direction = player.camera.forward() });
         if (selected_block == std::nullopt) {
             if (new_block != std::nullopt) {
@@ -177,7 +177,7 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
                 new_block->block_pos == selected_block->block_pos
             ) {
                 this->selected_block = new_block;
-                selected_block_damage -= BLOCK_DURABILITY / FPS;
+                selected_block_damage -= (10 * BLOCK_DURABILITY) / FPS;
                 if (selected_block_damage < 0) {
                     SetBlock(*selected_block, BlockType::Air);
                 }
@@ -318,6 +318,17 @@ void World::draw() {
     ImGui::DragInt("octaves", &octaves, 0, 20);
     if (ImGui::Button("regenerate")) {
         this->generate();
+    }
+    if (selected_block != std::nullopt) {
+        int block_type = static_cast<int>(GetBlock(*selected_block));
+        ImGui::InputInt("block type", &block_type);
+        int block_pos[] = { selected_block->block_pos.x, selected_block->block_pos.y, selected_block->block_pos.z };
+        int chunk_pos[] = { selected_block->chunk_pos.x, selected_block->chunk_pos.y };
+        ImGui::InputInt3("block_pos", block_pos);
+        ImGui::InputInt2("chunk_pos", chunk_pos);
+        
+    } else {
+        ImGui::LabelText("No block selected", "");
     }
     ImGui::End();
 }
