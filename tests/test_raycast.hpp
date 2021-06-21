@@ -1,18 +1,11 @@
-#include "standard.hpp"
-#include "chunk.hpp"
+#pragma once
 
-#include "test.hpp"
+#include "../src/chunk.hpp"
+#include "../src/standard.hpp"
 
-void TestRayCast();
-void TestBlockIndexing();
+#include "gtest/gtest.h"
 
-int main() {
-    for (auto fn : Testing::tests()) {
-        fn();
-    }
-}
-
-REGISTER_TEST(TestRayCast) {
+TEST(TestRayCast, Test) {
     Chunk chunk;
     for (int i = 0; i < 10; ++i) {
         chunk.GetBlock(glm::ivec3(i, 0, 0)) = BlockType::Stone;
@@ -34,7 +27,7 @@ REGISTER_TEST(TestRayCast) {
 
 glm::ivec3 to_loc(uint32_t pos);
 
-REGISTER_TEST(TestBlockIndexing) {
+TEST(TestBlockIndexing, Test) {
     Chunk chunk;
     uint32_t error_count = 0;
     uintptr_t start = reinterpret_cast<uintptr_t>(&chunk.GetBlock(glm::ivec3(0, 0, 0)));

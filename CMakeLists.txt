@@ -84,7 +84,7 @@ list(APPEND CPP_FILES
 add_executable(game src/main.cpp ${CPP_FILES})
 target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
 
-add_executable(test src/test.cpp ${CPP_FILES})
+add_executable(test tests/test.cpp ${CPP_FILES})
 target_link_libraries(test PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
 
 string(TIMESTAMP CURRENT_DATE_TIME "%Y_%m_%d_%H_%M_%S")
