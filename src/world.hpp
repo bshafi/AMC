@@ -21,6 +21,7 @@ struct World {
 
     Texture blocks_texture;
     Shader shader;
+    Shader block_shader;
 
     uint32_t cube_vertices_VBO;
     uint32_t VAO;
@@ -33,9 +34,7 @@ struct World {
 
     static constexpr uint32_t WORLD_VERSION = 1;
     static const uint32_t DEFAULT_SEED = 0x33333333;
-
-
-
+    
     glm::vec3 try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const;
     bool intersects_block(const glm::vec3 &pos, const AABB &aabb) const;
     std::optional<BlockHit> GetBlockFromRay(const Ray &ray);

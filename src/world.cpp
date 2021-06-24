@@ -13,9 +13,10 @@
 #include "imgui_impl_sdl.h"
 
 World::World() : 
-    orientation_texture{ "resources/hello_cube_orientation.png" },
-    blocks_texture{ "resources/blocks.png" }, 
-    shader{ "shaders/chunk.vert", "shaders/chunk.frag" } {
+    orientation_texture("resources/hello_cube_orientation.png"),
+    blocks_texture("resources/blocks.png"),
+    shader("shaders/chunk.vert", "shaders/chunk.frag"),
+    block_shader("shaders/block.vert", "shaders/chunk.frag") {
 
     ASSERT_ON_GL_ERROR();
 
@@ -59,6 +60,9 @@ World::World() :
 
     this->shader.bind_UBO("globals_3d", 0);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
+
+    //this->block_shader.bind_UBO("globals_3d", 0);
+    //glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
     ASSERT_ON_GL_ERROR();
 
@@ -148,10 +152,10 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
         if (keypresses[SDL_SCANCODE_D]) {
             player.move_right(speed, *this);
         }
-        if (keypresses[SDL_SCANCODE_S])  {
+        if (keypresses[SDL_SCANCODE_S]) {
             player.move_forward(-speed, *this);
         }
-        if (keypresses[SDL_SCANCODE_W])  {
+        if (keypresses[SDL_SCANCODE_W]) {
             player.move_forward(speed, *this);
         }
         if (keypresses[SDL_SCANCODE_F3]) {
@@ -162,29 +166,19 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
 
     const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
     if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-        //std::cout << (rand() % 2 ? '1' : '0')  << std::endl;
-        auto new_block = GetBlockFromRay(Ray{ .endpoint = player.position/*player.camera.pos() + glm::vec3(0.5f, 1.5f, 0.5f)*/, .direction = player.camera.forward() });
-        if (selected_block == std::nullopt) {
-            if (new_block != std::nullopt) {
-                std::cout << new_block->block_pos.x << ", " << new_block->block_pos.y << ", " << new_block->block_pos.z << std::endl;
+        auto new_block = GetBlockFromRay(Ray{ .endpoint = player.camera.pos(), .direction = player.camera.forward() });
+        if (selected_block != std::nullopt &&
+            new_block->chunk_pos == selected_block->chunk_pos &&
+            new_block->block_pos == selected_block->block_pos
+        ) {
+            this->selected_block = new_block;
+            selected_block_damage -= (10 * BLOCK_DURABILITY) / FPS;
+            if (selected_block_damage < 0) {
+                SetBlock(*selected_block, BlockType::Air);
             }
+        } else {
             this->selected_block = new_block;
             selected_block_damage = BLOCK_DURABILITY;
-        } else if (new_block == std::nullopt) {
-        } else {
-            if (
-                new_block->chunk_pos == selected_block->chunk_pos && 
-                new_block->block_pos == selected_block->block_pos
-            ) {
-                this->selected_block = new_block;
-                selected_block_damage -= (10 * BLOCK_DURABILITY) / FPS;
-                if (selected_block_damage < 0) {
-                    SetBlock(*selected_block, BlockType::Air);
-                }
-            } else {
-                this->selected_block = new_block;
-                selected_block_damage = BLOCK_DURABILITY;
-            }
         }
     }
 }
@@ -296,6 +290,11 @@ void World::draw() {
         ASSERT_ON_GL_ERROR();
 
         shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
+        if (selected_block != std::nullopt && selected_block->chunk_pos == chunk_pos) {
+            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(selected_block->block_pos);
+        } else {
+            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(glm::ivec3(1, 1, 1) * INT32_MIN);
+        }
 
         glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
         glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(BlockType) * Chunk::BLOCKS_IN_CHUNK, chunk.blocks.data());
@@ -326,7 +325,8 @@ void World::draw() {
         int chunk_pos[] = { selected_block->chunk_pos.x, selected_block->chunk_pos.y };
         ImGui::InputInt3("block_pos", block_pos);
         ImGui::InputInt2("chunk_pos", chunk_pos);
-        
+        float block_damage = static_cast<float>(selected_block_damage) / BLOCK_DURABILITY;
+        ImGui::InputFloat("block_damage", &block_damage);
     } else {
         ImGui::LabelText("No block selected", "");
     }
@@ -343,12 +343,10 @@ void World::generate(uint32_t seed) noexcept {
 
     for (uint32_t i = 0; i < 5; ++i)
         for (uint32_t j = 0; j < 5; ++j) {
-        
-        //std::unique_ptr<Chunk> &chunk = chunks.emplace_back(std::make_unique<Chunk>());
         Chunk chunk;
 
         for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-            BlockType block_id = BlockType::Air ;
+            BlockType block_id = BlockType::Air;
             assert(0 <= pos.x && pos.x < Chunk::CHUNK_WIDTH);
             assert(0 <= pos.z && pos.z < Chunk::CHUNK_WIDTH);
 
@@ -401,7 +399,6 @@ void World::load(const std::string &path) {
         pad16();
 
         for (uint32_t i = 0; i < chunks_count; ++i) {
-            //std::unique_ptr<Chunk> &chunk = this->chunks.emplace_back(std::make_unique<Chunk>());
             Chunk chunk;
             file.seekg(chunk_positions[i], std::ios_base::beg);
 
