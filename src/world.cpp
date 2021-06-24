@@ -286,8 +286,13 @@ void World::draw() {
 
     shader.use();
 
+    float RENDER_DISTANCE = World::RENDER_DISTANCE * Chunk::CHUNK_WIDTH;
     for (auto &[chunk_pos, chunk] : chunks) {
         ASSERT_ON_GL_ERROR();
+
+        if (glm::length(glm::vec2(player.position.x, player.position.z) - glm::vec2(chunk.world_pos().x, chunk.world_pos().z)) >= RENDER_DISTANCE) {
+            continue;
+        }
 
         shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
         if (selected_block != std::nullopt && selected_block->chunk_pos == chunk_pos) {

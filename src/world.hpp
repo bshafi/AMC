@@ -15,6 +15,7 @@ struct World {
     std::optional<BlockHit> selected_block;
     int32_t selected_block_damage;
     static constexpr uint32_t BLOCK_DURABILITY = 100;
+    static constexpr uint32_t RENDER_DISTANCE = 4;
     Inventory inventory;
 
     Texture orientation_texture;
