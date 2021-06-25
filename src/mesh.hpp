@@ -9,7 +9,8 @@ struct BlockVertex {
     glm::vec3 position;
     glm::vec2 tex_coords;
     BlockType block_id;
-    static constexpr uint32_t gl_size = sizeof(position) + sizeof(tex_coords) + sizeof(block_id);
+    glm::ivec3 original_location;
+    static constexpr uint32_t gl_size = sizeof(position) + sizeof(tex_coords) + sizeof(block_id) + sizeof(original_location);
 };
 
 struct BlockMesh {

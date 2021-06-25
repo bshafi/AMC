@@ -39,7 +39,8 @@ BlockMesh BlockMesh::Generate(const Chunk &chunk) {
             BlockVertex vertex = {
                 center + glm::vec3(cube_vertices[offset + 0], cube_vertices[offset + 1], cube_vertices[offset + 2]),
                 glm::vec2(cube_vertices[offset + 3], cube_vertices[offset + 4]),
-                block_type
+                block_type,
+                pos
             };
             mesh.vertices.push_back(vertex);
         }
@@ -87,6 +88,7 @@ MeshBuffer::MeshBuffer(const BlockMesh &block_mesh)
         glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3), sizeof(glm::vec2), glm::value_ptr(vertex.tex_coords));
         uint32_t block_id = static_cast<uint32_t>(vertex.block_id);
         glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3) + sizeof(glm::vec2), sizeof(BlockType), &block_id);
+        glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3) + sizeof(glm::vec2) + sizeof(BlockType), sizeof(glm::ivec3), glm::value_ptr(vertex.original_location));
     }
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     size = block_mesh.vertices.size();
@@ -109,6 +111,9 @@ MeshBuffer::MeshBuffer(uint32_t size) {
 
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, BlockVertex::gl_size, (void*)(sizeof(glm::vec2) + sizeof(glm::vec3)));
     glEnableVertexAttribArray(2);
+    
+    glVertexAttribIPointer(3, 3, GL_INT, BlockVertex::gl_size, (void*)(sizeof(glm::vec2) + sizeof(glm::vec3) + sizeof(BlockType)));
+    glEnableVertexAttribArray(3);
 
     glBindVertexArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, 0);

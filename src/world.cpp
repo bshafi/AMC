@@ -331,6 +331,12 @@ void World::draw() {
             continue;
         }
         block_shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
+        if (selected_block != std::nullopt && selected_block->chunk_pos == chunk_pos) {
+            block_shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(selected_block->block_pos);
+        } else {
+            block_shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(glm::ivec3(1, 1, 1) * INT32_MIN);
+        }
+
         mesh_buffer.draw();
     }
 
