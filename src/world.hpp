@@ -5,11 +5,13 @@
 #include "chunk.hpp"
 #include "player.hpp"
 #include "inventory.hpp"
+#include "mesh.hpp"
 
 class Renderer;
 
 struct World {
     std::unordered_map<glm::ivec2, Chunk> chunks;
+    std::unordered_map<glm::ivec2, MeshBuffer> meshes;
 
     Player player;
     std::optional<BlockHit> selected_block;
