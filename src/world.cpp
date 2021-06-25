@@ -181,6 +181,11 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
             selected_block_damage -= (10 * BLOCK_DURABILITY) / FPS;
             if (selected_block_damage < 0) {
                 SetBlock(*selected_block, BlockType::Air);
+
+                auto loc = meshes.find(new_block->chunk_pos);
+                if (loc != meshes.end()) {
+                    loc->second = MeshBuffer(BlockMesh::Generate(chunks[new_block->chunk_pos]));
+                }
             }
         } else {
             this->selected_block = new_block;
