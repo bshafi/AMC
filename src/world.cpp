@@ -47,6 +47,10 @@ World::World() :
         { "orientation", orientation_texture },
         { "blocks", blocks_texture }
     });
+    block_shader.bind_texture_to_sampler_2D({
+        { "orientation", orientation_texture },
+        { "blocks", blocks_texture }
+    });
 
     ASSERT_ON_GL_ERROR();
 
@@ -61,10 +65,12 @@ World::World() :
     this->shader.bind_UBO("globals_3d", 0);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
-    //this->block_shader.bind_UBO("globals_3d", 0);
-    //glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
+    this->block_shader.bind_UBO("globals_3d", 0);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
     ASSERT_ON_GL_ERROR();
+
+
 
     selected_block_damage = BLOCK_DURABILITY;
 }
@@ -175,6 +181,11 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
             selected_block_damage -= (10 * BLOCK_DURABILITY) / FPS;
             if (selected_block_damage < 0) {
                 SetBlock(*selected_block, BlockType::Air);
+
+                auto loc = meshes.find(new_block->chunk_pos);
+                if (loc != meshes.end()) {
+                    loc->second = MeshBuffer(BlockMesh::Generate(chunks[new_block->chunk_pos]));
+                }
             }
         } else {
             this->selected_block = new_block;
@@ -204,43 +215,43 @@ glm::vec3 World::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, c
 }
 
 BlockHit::Face get_hit_face(const glm::vec3 &hit_pos, const glm::ivec3 &block_location) {
-        const glm::vec3 world_location = glm::vec3(block_location) + 0.5f * glm::vec3(1, 1, 1);
-        const glm::vec3 hit_offset = hit_pos - world_location;
-        int max_dir = 0;
-        if (fabs(hit_offset[max_dir]) < fabs(hit_offset.y)) {
-            max_dir = 1;
-        }
-        if (fabs(hit_offset[max_dir]) < fabs(hit_offset.z)) {
-            max_dir = 2;
-        }
-        switch (max_dir) {
-        case 0: {
-                if (hit_offset.x < 0) {
-                    return BlockHit::Face::NegX;
-                } else {
-                    return BlockHit::Face::PosX;
-                }
+    const glm::vec3 world_location = glm::vec3(block_location) + 0.5f * glm::vec3(1, 1, 1);
+    const glm::vec3 hit_offset = hit_pos - world_location;
+    int max_dir = 0;
+    if (fabs(hit_offset[max_dir]) < fabs(hit_offset.y)) {
+        max_dir = 1;
+    }
+    if (fabs(hit_offset[max_dir]) < fabs(hit_offset.z)) {
+        max_dir = 2;
+    }
+    switch (max_dir) {
+    case 0: {
+            if (hit_offset.x < 0) {
+                return BlockHit::Face::NegX;
+            } else {
+                return BlockHit::Face::PosX;
             }
-            break;
-        case 1: {
-                if (hit_offset.y < 0) {
-                    return BlockHit::Face::NegY;
-                } else {
-                    return BlockHit::Face::PosY;
-                }
-            }
-            break;
-        case 2: {
-                if (hit_offset.z < 0) {
-                    return BlockHit::Face::NegZ;
-                } else {
-                    return BlockHit::Face::PosZ;
-                }
-            }
-            break;
-        default:
-            assert(false);
         }
+        break;
+    case 1: {
+            if (hit_offset.y < 0) {
+                return BlockHit::Face::NegY;
+            } else {
+                return BlockHit::Face::PosY;
+            }
+        }
+        break;
+    case 2: {
+            if (hit_offset.z < 0) {
+                return BlockHit::Face::NegZ;
+            } else {
+                return BlockHit::Face::PosZ;
+            }
+        }
+        break;
+    default:
+        assert(false);
+    }
 }
 
 std::optional<BlockHit> World::GetBlockFromRay(const Ray &ray) {
@@ -283,11 +294,21 @@ void World::draw() {
         { "orientation", orientation_texture },
         { "blocks", blocks_texture }
     });
+    block_shader.bind_texture_to_sampler_2D({
+        { "orientation", orientation_texture },
+        { "blocks", blocks_texture }
+    });
 
     shader.use();
 
+    float RENDER_DISTANCE = World::RENDER_DISTANCE * Chunk::CHUNK_WIDTH;
+    /*
     for (auto &[chunk_pos, chunk] : chunks) {
         ASSERT_ON_GL_ERROR();
+
+        if (glm::length(glm::vec2(player.position.x, player.position.z) - glm::vec2(chunk.world_pos().x, chunk.world_pos().z)) >= RENDER_DISTANCE) {
+            continue;
+        }
 
         shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
         if (selected_block != std::nullopt && selected_block->chunk_pos == chunk_pos) {
@@ -303,6 +324,20 @@ void World::draw() {
         glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
         
         ASSERT_ON_GL_ERROR();
+    }
+    */
+    for (auto &[chunk_pos, mesh_buffer] : this->meshes) {
+        if (glm::length(glm::vec2(player.position.x, player.position.z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
+            continue;
+        }
+        block_shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
+        if (selected_block != std::nullopt && selected_block->chunk_pos == chunk_pos) {
+            block_shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(selected_block->block_pos);
+        } else {
+            block_shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(glm::ivec3(1, 1, 1) * INT32_MIN);
+        }
+
+        mesh_buffer.draw();
     }
 
     glBindVertexArray(0);
@@ -365,6 +400,7 @@ void World::generate(uint32_t seed) noexcept {
         }
         chunk.chunk_pos = glm::ivec2(i, j);
         chunks.emplace(std::make_pair<glm::ivec2, Chunk>(glm::ivec2(chunk.chunk_pos), std::move(chunk)));
+        meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk.chunk_pos), (MeshBuffer(BlockMesh::Generate(chunk)))));
     }
 }
 
@@ -415,6 +451,7 @@ void World::load(const std::string &path) {
             }
             pad16();
             chunks.emplace(std::make_pair<glm::ivec2, Chunk>(glm::ivec2(chunk.chunk_pos), std::move(chunk)));
+            meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk.chunk_pos), (MeshBuffer(BlockMesh::Generate(chunk)))));
         }
 
         file.close();

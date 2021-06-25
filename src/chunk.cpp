@@ -19,6 +19,10 @@ frect BlockRect(const BlockType &type) {
 
 Chunk::Chunk()
     : chunk_pos{ 0, 0 } {
+    
+    for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
+        GetBlock(pos) = BlockType::Air;
+    }
 }
 
 Chunk::~Chunk() {

@@ -5,16 +5,19 @@
 #include "chunk.hpp"
 #include "player.hpp"
 #include "inventory.hpp"
+#include "mesh.hpp"
 
 class Renderer;
 
 struct World {
     std::unordered_map<glm::ivec2, Chunk> chunks;
+    std::unordered_map<glm::ivec2, MeshBuffer> meshes;
 
     Player player;
     std::optional<BlockHit> selected_block;
     int32_t selected_block_damage;
     static constexpr uint32_t BLOCK_DURABILITY = 100;
+    static constexpr uint32_t RENDER_DISTANCE = 4;
     Inventory inventory;
 
     Texture orientation_texture;
