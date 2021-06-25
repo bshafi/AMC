@@ -15,39 +15,12 @@
 World::World() : 
     orientation_texture("resources/hello_cube_orientation.png"),
     blocks_texture("resources/blocks.png"),
-    shader("shaders/chunk.vert", "shaders/chunk.frag"),
-    block_shader("shaders/block.vert", "shaders/chunk.frag") {
-
-    ASSERT_ON_GL_ERROR();
-
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &cube_vertices_VBO);
-    glGenBuffers(1, &block_ids_VBO);
-
-    glBindVertexArray(VAO);
-    glBindBuffer(GL_ARRAY_BUFFER, cube_vertices_VBO); ASSERT_ON_GL_ERROR();
-    glBufferData(GL_ARRAY_BUFFER, sizeof(decltype(cube_vertices)::value_type) * cube_vertices.size(), cube_vertices.data(), GL_STATIC_DRAW); ASSERT_ON_GL_ERROR();
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 5, (void*)0); ASSERT_ON_GL_ERROR();
-    glEnableVertexAttribArray(0);
-
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 5, (void*)(3 * sizeof(float))); ASSERT_ON_GL_ERROR();
-    glEnableVertexAttribArray(1); ASSERT_ON_GL_ERROR();
-
-    glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(BlockType) * Chunk::BLOCKS_IN_CHUNK, nullptr, GL_DYNAMIC_DRAW);
-
-    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(BlockType), (void*)0);
-    glVertexAttribDivisor(2, 1);
-    glEnableVertexAttribArray(2);
+    shader("shaders/block.vert", "shaders/chunk.frag") {
 
     ASSERT_ON_GL_ERROR();
 
     shader.use();
     shader.bind_texture_to_sampler_2D({
-        { "orientation", orientation_texture },
-        { "blocks", blocks_texture }
-    });
-    block_shader.bind_texture_to_sampler_2D({
         { "orientation", orientation_texture },
         { "blocks", blocks_texture }
     });
@@ -65,7 +38,7 @@ World::World() :
     this->shader.bind_UBO("globals_3d", 0);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
-    this->block_shader.bind_UBO("globals_3d", 0);
+    this->shader.bind_UBO("globals_3d", 0);
     glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
 
     ASSERT_ON_GL_ERROR();
@@ -78,8 +51,6 @@ World::~World() {
     this->save(save_name);
 
     ASSERT_ON_GL_ERROR();
-
-    glDeleteBuffers(1, &cube_vertices_VBO);
 
     glDeleteBuffers(1, &globals_3d_ubo);
 
@@ -118,13 +89,6 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
             inventory.handle_events(event, outer, 0);
 
             if (event.type == SDL_MOUSEBUTTONDOWN) {
-                /*
-                const auto mouse_pos = glm::vec2(glm::ivec2(event.button.x, event.button.y));
-                const auto space_pos = inventory.get_space_from_mouse_pos(mouse_pos, outer);
-                if (space_pos.has_value()) {
-                    auto space = inventory.pop_space(space_pos->x, space_pos->y);
-                }
-                */
             }
         } else {
             if (event.type == SDL_MOUSEBUTTONDOWN && SDL_GetRelativeMouseMode() == SDL_FALSE && event.button.button == SDL_BUTTON_LEFT) {
@@ -294,7 +258,7 @@ void World::draw() {
         { "orientation", orientation_texture },
         { "blocks", blocks_texture }
     });
-    block_shader.bind_texture_to_sampler_2D({
+    shader.bind_texture_to_sampler_2D({
         { "orientation", orientation_texture },
         { "blocks", blocks_texture }
     });
@@ -330,11 +294,11 @@ void World::draw() {
         if (glm::length(glm::vec2(player.position.x, player.position.z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
             continue;
         }
-        block_shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
+        shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
         if (selected_block != std::nullopt && selected_block->chunk_pos == chunk_pos) {
-            block_shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(selected_block->block_pos);
+            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(selected_block->block_pos);
         } else {
-            block_shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(glm::ivec3(1, 1, 1) * INT32_MIN);
+            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(glm::ivec3(1, 1, 1) * INT32_MIN);
         }
 
         mesh_buffer.draw();

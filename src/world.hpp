@@ -24,11 +24,7 @@ struct World {
 
     Texture blocks_texture;
     Shader shader;
-    Shader block_shader;
-
-    uint32_t cube_vertices_VBO;
-    uint32_t VAO;
-    uint32_t block_ids_VBO;
+    
     uint32_t globals_3d_ubo;
 
     std::string save_name;
