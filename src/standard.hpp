@@ -117,6 +117,8 @@ struct BoundingBox {
     AABB aabb;
 
     bool contains(const glm::vec3 &point) const;
+    glm::vec3 back_bottom_left() const;
+    glm::vec3 top_front_right() const;
 };
 
 // expects that pos is in the bottom back left corner

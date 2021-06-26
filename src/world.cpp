@@ -258,10 +258,6 @@ void World::draw() {
         { "orientation", orientation_texture },
         { "blocks", blocks_texture }
     });
-    shader.bind_texture_to_sampler_2D({
-        { "orientation", orientation_texture },
-        { "blocks", blocks_texture }
-    });
 
     shader.use();
 

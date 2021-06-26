@@ -52,3 +52,5 @@ struct World {
     void handle_events(const std::vector<SDL_Event> &events);
     void draw();
 };
+
+BlockHit::Face get_hit_face(const glm::vec3 &hit_pos, const glm::ivec3 &block_location);

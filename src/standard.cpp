@@ -104,6 +104,12 @@ bool BoundingBox::contains(const glm::vec3 &point) const {
     const bool z_overlap = (this->pos.z <= point.z) && (point.z <= this->pos.z + this->aabb.length);
     return x_overlap && y_overlap && z_overlap;
 }
+glm::vec3 BoundingBox::back_bottom_left() const {
+    return this->pos;
+}
+glm::vec3 BoundingBox::top_front_right() const {
+    return this->pos + glm::vec3(this->aabb.width, this->aabb.height, this->aabb.length);
+}
 
 namespace std {
     static uint32_t i32_to_u32(int32_t x) {

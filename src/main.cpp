@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <iostream>
 #include <vector>
+#include <functional>
 #include <map>
 
 #include "gl_helper.hpp"
