@@ -1,44 +1,59 @@
 #pragma once
 
 #include <fstream>
-#include <unordered_map>
 
 #include "standard.hpp"
 #include "chunk.hpp"
+#include "mesh.hpp"
+
+class ChunkLoader;
 
 class Terrain {
 public:
-    virtual Chunk* GetChunk(glm::ivec2 pos) = 0;
-    virtual const Chunk* GetChunk(glm::ivec2 pos) const = 0;
+    Terrain(std::unique_ptr<ChunkLoader> &&save_file);
 
-    virtual void AllocateChunk(const glm::ivec2 &pos) = 0;
-    virtual void DeallocateChunk(const glm::ivec2 &pos) = 0;
+    BlockType& block(const BlockHit &hit);
+    BlockType& block(const glm::ivec2 &chunk_pos, const glm::ivec3 &block_pos);
+    BlockType& block(const glm::ivec3 &world_pos);
+    bool intersects_bounding_box(const BoundingBox &bb) const;
+    std::optional<float> ray_cast(const Ray &ray, const float) const;
+    std::optional<BlockHit> block_ray_cast(const Ray &ray, const float) const;
+
+    void bind_UBO(const std::string &name, uint32_t loc);
+
+    void draw();
 private:
-};
+    std::unique_ptr<ChunkLoader> save_file;
 
-class SaveTerrain : public Terrain {
-public:
-    SaveTerrain(const std::string &path);
+    Texture blocks_texture;
+    Shader shader;
 
-    virtual Chunk* GetChunk(glm::ivec2 pos) override;
-    virtual const Chunk* GetChunk(glm::ivec2 pos) const override;
-
-    virtual void AllocateChunk(const glm::ivec2 &pos) override;
-    virtual void DeallocateChunk(const glm::ivec2 &pos) override;
-private:
-    void LoadChunk(const glm::ivec2 &pos);
-
-    std::fstream save_file;
-    std::unordered_map<glm::ivec2, std::streampos> chunk_positions;
     std::unordered_map<glm::ivec2, Chunk> chunks;
+    std::unordered_map<glm::ivec2, MeshBuffer> meshes;
 };
 
-class ServerTerrain : public Terrain {
+class ChunkLoader {
 public:
-    virtual Chunk* GetChunk(glm::ivec2 pos) override;
-    virtual const Chunk* GetChunk(glm::ivec2 pos) const override;
+    virtual Chunk read_chunk(const glm::ivec2 &chunk_pos) = 0;
+    virtual void write_chunk(const Chunk &chunk) = 0;
+    virtual ~ChunkLoader() {
 
-    virtual void AllocateChunk(const glm::ivec2 &pos) override;
-    virtual void DeallocateChunk(const glm::ivec2 &pos) override;
+    }
 private:
+};
+
+class SaveFile : public ChunkLoader {
+public:
+    SaveFile(const std::string &file_path);
+    ~SaveFile();
+
+    virtual Chunk read_chunk(const glm::ivec2 &chunk_pos) override;
+    virtual void write_chunk(const Chunk &chunk) override;
+private:
+
+
+    std::string path;
+
+    std::fstream file;
+    std::unordered_map<glm::ivec2, uint32_t> chunk_file_pos;
 };
