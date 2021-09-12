@@ -1,7 +1,9 @@
 #include "world.hpp"
 #include "player.hpp"
 
-float Player::gravity = 9.8f;
+float Player::gravity = 0.08f;
+float Player::movement_speed = 0.7f;
+float Player::jump_speed = 0.5f;
 
 Player::Player() {
     debug_mode = true;
@@ -32,18 +34,18 @@ void Player::apply_gravity(World &w) {
 }
 void Player::move_forward(float f, World &w) {
     if (debug_mode) {
-        set_position(w.try_move_to(this->position, this->camera.forward() * speed * f, this->aabb));
+        set_position(w.try_move_to(this->position, this->camera.forward() * movement_speed * f, this->aabb));
     } else {
         glm::vec2 forward = { cos(camera.yaw()), sin(camera.yaw()) };
-        set_position(w.try_move_to(this->position, glm::vec3(forward.x, 0, forward.y) * speed * f, this->aabb));
+        set_position(w.try_move_to(this->position, glm::vec3(forward.x, 0, forward.y) * movement_speed * f, this->aabb));
     }
 }
 void Player::move_right(float f, World &w) {
     if (debug_mode) {
-        set_position(w.try_move_to(this->position, this->camera.right() * speed * f, this->aabb));
+        set_position(w.try_move_to(this->position, this->camera.right() * movement_speed * f, this->aabb));
     } else {
         glm::vec2 right = { -sin(camera.yaw()), cos(camera.yaw()) };
-        set_position(w.try_move_to(this->position, glm::vec3(right.x, 0, right.y) * speed * f, this->aabb));
+        set_position(w.try_move_to(this->position, glm::vec3(right.x, 0, right.y) * movement_speed * f, this->aabb));
     }
 }
 void Player::look_up(float f, World &w) {
@@ -53,8 +55,9 @@ void Player::look_right(float f, World &w) {
     this->camera.rotate_right(f);
 }
 void Player::jump(World &w) {
-    if (fabs(this->velocity.y) < 0.01) {
-        this->velocity.y = .8f;
+    if (fabs(this->velocity.y) < 0.1) {
+        //this->velocity.y = .8f;
+        this->velocity.y = jump_speed;
     } else {
         std::cout << "y velocity was " << velocity.y << std::endl;
     }
