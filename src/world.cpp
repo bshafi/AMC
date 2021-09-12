@@ -317,6 +317,12 @@ void World::draw() {
     if (ImGui::Button("regenerate")) {
         this->generate();
     }
+    if (ImGui::Button("toggle debug mode")) {
+        player.debug_mode = !player.debug_mode;
+    }
+    ImGui::DragFloat("gravity", &Player::gravity, 0.0f, 10.0f);
+    ImGui::DragFloat("movement_speed", &Player::movement_speed, 0.0f, 10.0f);
+    ImGui::DragFloat("jump_speed", &Player::jump_speed, 0.0f, 10.0f);
     if (selected_block != std::nullopt) {
         int block_type = static_cast<int>(GetBlock(*selected_block));
         ImGui::InputInt("block type", &block_type);
