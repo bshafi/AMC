@@ -17,7 +17,7 @@ void Rigidbody::update_pos(glm::vec3 &pos, World &world, const float delta_time)
     const auto impulse_forces = this->impulse_forces;
     this->impulse_forces = glm::vec3(0, 0, 0);
     
-    const glm::vec3 accel_due_to_gravity = (has_gravity ? 9.8f : 0.0f) * glm::vec3(0, -1.0f, 0);
+    const glm::vec3 accel_due_to_gravity = (has_gravity ? 1.8f : 0.0f) * glm::vec3(0, -1.0f, 0);
     const glm::vec3 new_vel = accel_due_to_gravity * delta_time + velocity + impulse_forces;
     const glm::vec3 new_pos = velocity * delta_time + pos;
 

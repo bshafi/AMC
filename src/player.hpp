@@ -12,7 +12,8 @@ struct Player {
     Camera camera;
     bool debug_mode;
 
-    static constexpr float speed = 1.f;
+    static float movement_speed;
+    static float jump_speed;
     Player();
 
     void set_position(const glm::vec3 &);
