@@ -136,7 +136,7 @@ void World::handle_events(const std::vector<SDL_Event> &events) {
 
     const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
     if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-        auto new_block = GetBlockFromRay(Ray{ .endpoint = player.camera.pos(), .direction = player.camera.forward() });
+        auto new_block = GetBlockFromRay(Ray{ player.camera.pos(), player.camera.forward() });
         if (selected_block != std::nullopt &&
             new_block->chunk_pos == selected_block->chunk_pos &&
             new_block->block_pos == selected_block->block_pos

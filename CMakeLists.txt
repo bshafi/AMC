@@ -1,77 +1,14 @@
 cmake_minimum_required(VERSION 3.2)
 set(CMAKE_CXX_STANDARD 17)
 
-include("cmake/HunterGate.cmake")
-
-if (NOT HUNTER_URL AND NOT HUNTER_SHA1)
-  file(
-    DOWNLOAD https://api.github.com/repos/cpp-pm/hunter/releases/latest
-    ${CMAKE_BINARY_DIR}/LatestGate.json)
-
-  file(READ ${CMAKE_BINARY_DIR}/LatestGate.json latestGateJson)
-  string(REGEX MATCH "tag_name\": \"([a-z0-9.]+)\"" tagName "${latestGateJson}")
-
-  set(hunterUrlTarball "https://github.com/cpp-pm/hunter/archive/${CMAKE_MATCH_1}.tar.gz")
-  set(hunterLocalTarballName "${CMAKE_BINARY_DIR}/hunter-${CMAKE_MATCH_1}.tar.gz")
-
-  file(DOWNLOAD ${hunterUrlTarball} "${hunterLocalTarballName}")
-
-  file(SHA1 "${hunterLocalTarballName}" HUNTER_SHA1)
-  set(HUNTER_URL "file://${hunterLocalTarballName}")
-endif()
-
-HunterGate(
-    URL ${HUNTER_URL}
-    SHA1 ${HUNTER_SHA1}
-)
-
-project(Hope)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -glldb -Wall -Wno-unused-const-variable -Werror -fsanitize=address")
-
-hunter_add_package(msgpack)
-find_package(msgpack CONFIG REQUIRED)
-list(APPEND TEMP_LIBRARIES msgpack::msgpack)
-
-hunter_add_package(SDL2)
-find_package(SDL2 CONFIG REQUIRED)
-list(APPEND TEMP_LIBRARIES SDL2::SDL2)
-
-hunter_add_package(SDL_image)
-find_package(SDL_image CONFIG REQUIRED)
-list(APPEND TEMP_LIBRARIES SDL_image::SDL_image)
-
-hunter_add_package(SDL_ttf)
-find_package(SDL_ttf CONFIG REQUIRED)
-list(APPEND TEMP_LIBRARIES SDL_ttf::SDL_ttf)
-
-hunter_add_package(vorbis)
-find_package(vorbis CONFIG REQUIRED)
-list(APPEND TEMP_LIBRARIES vorbis::vorbis)
-
-hunter_add_package(SDL_mixer)
-find_package(SDL_mixer CONFIG REQUIRED vorbis::vorbis)
-list(APPEND TEMP_LIBRARIES SDL_mixer::SDL_mixer)
-
-hunter_add_package(glew)
-find_package(glew CONFIG REQUIRED)
-list(APPEND TEMP_LIBRARIES glew::glew)
+project(AMC)
 
 find_package(OpenGL REQUIRED)
-find_package(GLUT REQUIRED)
-include_directories(${OPENGL_INCLUDE_DIRS}  ${GLUT_INCLUDE_DIRS})
 
-hunter_add_package(glm)
-find_package(glm REQUIRED)
-list(APPEND TEMP_LIBRARIES glm)
-
-hunter_add_package(OpenAL)
-find_package(OpenAL CONFIG REQUIRED)
-list(APPEND OpenAL::OpenAL)
-
-hunter_add_package(GTest)
-find_package(GTest CONFIG REQUIRED)
-list(APPEND TEMP_LIBRARIES GTest::gtest)
+add_subdirectory(libs/SDL)
+add_subdirectory(libs/SDL_image)
+add_subdirectory(libs/glew-cmake)
+add_subdirectory(libs/glm)
 
 list(APPEND CPP_FILES
   src/gl_helper.cpp src/hello_cube.cpp src/shader.cpp src/camera.cpp 
@@ -81,17 +18,7 @@ list(APPEND CPP_FILES
   src/imgui_impl_opengl3.cpp src/mesh.cpp src/rigidbody.cpp
 )
 
+
 add_executable(game src/main.cpp ${CPP_FILES})
-target_link_libraries(game PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
-
-add_executable(test tests/test.cpp ${CPP_FILES})
-target_link_libraries(test PUBLIC ${TEMP_LIBRARIES} ${OPENGL_LIBRARIES} ${GLUT_LIBRARY})
-
-string(TIMESTAMP CURRENT_DATE_TIME "%Y_%m_%d_%H_%M_%S")
-
-add_custom_command(
-    TARGET game POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${CMAKE_CURRENT_LIST_DIR}/saves/
-    ${CMAKE_CURRENT_LIST_DIR}/backup/${CURRENT_DATE_TIME}/
-)
+target_link_libraries(game SDL2 libglew_static SDL2_image glm::glm)
+target_include_directories(game PRIVATE ${OPENGL_INCLUDE_DIRS})

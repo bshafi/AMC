@@ -8,7 +8,7 @@
 
 const glm::vec3 Camera::UP = glm::vec3(0, 1, 0);
 
-Camera::Camera(glm::vec3 camera_pos) : camera_pos{camera_pos}, h_yaw{-M_PI_2}, h_pitch{0.0f} {
+Camera::Camera(glm::vec3 camera_pos) : camera_pos{ camera_pos }, h_yaw{ -glm::half_pi<float>()}, h_pitch{0.0f} {
 
 }
 

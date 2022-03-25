@@ -5,6 +5,8 @@
 #include "tool.hpp"
 #include "inventory.hpp"
 
+#include <array>
+
 #ifdef MANUAL_LEAK_CHECK
     std::map<uintptr_t, std::pair<std::string, uint32_t>> pointers = std::map<uintptr_t, std::pair<std::string, uint32_t>>();
 #endif

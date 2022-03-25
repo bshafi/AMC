@@ -14,6 +14,8 @@
 #include <unordered_map>
 #include <optional>
 #include <iostream>
+#include <array>
+#include <functional>
 
 //#define MANUAL_LEAK_CHECK
 

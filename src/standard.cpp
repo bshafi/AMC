@@ -236,8 +236,8 @@ std::optional<float> Ray::cast(const BoundingBox &box, const float length) const
 
     const float ERROR = 0.001f;
     const BoundingBox loose_box = BoundingBox{
-        .pos = box.pos - glm::vec3(ERROR, ERROR, ERROR), 
-        .aabb = {
+        box.pos - glm::vec3(ERROR, ERROR, ERROR), 
+        {
             box.aabb.width + 2 * ERROR,
             box.aabb.height + 2 * ERROR,
             box.aabb.length + 2 * ERROR,
