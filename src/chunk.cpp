@@ -152,7 +152,8 @@ bool Chunk::intersects(glm::vec3 pos, AABB aabb) const {
     AABB chunk_aabb = this->bounding_box();
 
     // Check if the thing intersects the entire chunk in the first place
-    if (! ::intersects(BoundingBox{ chunk_pos_world_coords, chunk_aabb }, BoundingBox{ pos, aabb })) {
+    //TODO: Change AABB intersection to ::intersects
+    if (! AABBIntersection(chunk_pos_world_coords, chunk_aabb, pos, aabb)) {
         return false;
     }
 

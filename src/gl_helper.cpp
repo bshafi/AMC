@@ -16,8 +16,6 @@ constexpr uint32_t DEFAULT_IMG_INIT_FLAGS = IMG_INIT_PNG;
 constexpr uint32_t DEFAULT_FONT_SIZE = 24;
 constexpr SDL_Color WHITE = { 255, 255, 255, 255 };
 
-TTF_Font *default_font = nullptr;
-
 uint32_t SCENE_CHANGE_EVENT;
 
 struct FilterData {
@@ -28,12 +26,9 @@ struct FilterData {
 } filter_data;
 
 SDL_Window *Init_SDL_and_GL() {
+    SDL_SetMainReady();
     assert(SDL_Init(DEFAULT_SDL_INIT_FLAGS) == 0);
     assert(IMG_Init(DEFAULT_IMG_INIT_FLAGS) == DEFAULT_IMG_INIT_FLAGS);
-    assert(TTF_Init() == 0);
-
-    default_font = TTF_OpenFont("resources/cmuntt.ttf", DEFAULT_FONT_SIZE);
-    assert(default_font);
 
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3) == 0);
     assert(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2) == 0);
@@ -120,10 +115,8 @@ void Quit_SDL_and_GL() {
     SDL_GL_DeleteContext(filter_data.context);
     filter_data.filter_mutex.unlock();
 
-    TTF_CloseFont(default_font);
 
     IMG_Quit();
-    TTF_Quit();
     SDL_Quit();
 }
 
@@ -287,9 +280,9 @@ uint32_t LoadImage(const std::string &imagePath, uint32_t *width, uint32_t *heig
 }
 
 uint32_t RasterizeText(const std::string &text) {
-    assert(default_font);
+    //assert(default_font);
 
-    SDL_Surface *modified = TTF_RenderText_Blended(default_font, text.c_str(), WHITE);
+    //SDL_Surface *modified = TTF_RenderText_Blended(default_font, text.c_str(), WHITE);
 
     unsigned int texture;
     glGenTextures(1, &texture);
@@ -299,10 +292,10 @@ uint32_t RasterizeText(const std::string &text) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, modified->w, modified->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, modified->pixels);
+    //glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, modified->w, modified->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, modified->pixels);
     glGenerateMipmap(GL_TEXTURE_2D);
 
-    SDL_FreeSurface(modified);
+    //SDL_FreeSurface(modified);
 
     return texture;
 }

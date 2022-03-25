@@ -4,3 +4,9 @@
 [submodule "libs/glew-cmake"]
 	path = libs/glew-cmake
 	url = https://github.com/Perlmint/glew-cmake.git
+[submodule "libs/SDL_image"]
+	path = libs/SDL_image
+	url = https://github.com/libsdl-org/SDL_image.git
+[submodule "libs/glm"]
+	path = libs/glm
+	url = https://github.com/g-truc/glm.git
