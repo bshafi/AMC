@@ -13,7 +13,7 @@ void Rigidbody::apply_impulse(const glm::vec3 &force) {
     impulse_forces += force;
 }
 
-void Rigidbody::update_pos(glm::vec3 &pos, World &world, const float delta_time) {
+void Rigidbody::update_pos(glm::vec3 &pos, PhysicalWorld &world, const float delta_time) {
     const auto impulse_forces = this->impulse_forces;
     this->impulse_forces = glm::vec3(0, 0, 0);
     

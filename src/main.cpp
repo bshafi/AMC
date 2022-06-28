@@ -18,6 +18,7 @@
 
 void gen_main_gui(GUI &);
 
+
 int main() {
     SDL_Window *window = Init_SDL_and_GL();
 
@@ -139,6 +140,7 @@ int main() {
         SDL_GL_SwapWindow(window);
 
         delta_ticks = SDL_GetTicks() - ticks;
+        printf("%u\n", delta_ticks); fflush(stdout);
         if (delta_ticks * FPS  < 1000) {
             SDL_Delay((1000 / FPS) - delta_ticks);
         }

@@ -18,20 +18,13 @@ struct Player {
     Player();
 
     void set_position(const glm::vec3 &);
-    void apply_gravity(World&);
-    void move_forward(float, World&);
-    void move_right(float, World&);
-    void look_up(float, World&);
-    void look_right(float, World&);
-    void jump(World&);
 
-
-    void apply_gravity_phys(PhysicalWorld &);
-    void move_forward_phys(float, PhysicalWorld&);
-    void move_right_phys(float, PhysicalWorld&);
-    void look_up_phys(float, PhysicalWorld&);
-    void look_right_phys(float, PhysicalWorld&);
-    void jump_phys(PhysicalWorld&);
+    void apply_gravity(PhysicalWorld &);
+    void move_forward(float, PhysicalWorld&);
+    void move_right(float, PhysicalWorld&);
+    void look_up(float, PhysicalWorld&);
+    void look_right(float, PhysicalWorld&);
+    void jump(PhysicalWorld&);
     void toggle_debug_mode();
 
     static float gravity;
