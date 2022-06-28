@@ -4,6 +4,7 @@
 #include "camera.hpp"
 
 struct World;
+struct PhysicalWorld;
 
 struct Player {
     glm::vec3 velocity;
@@ -23,7 +24,15 @@ struct Player {
     void look_up(float, World&);
     void look_right(float, World&);
     void jump(World&);
-    void toggle_debug_mode(World&);
+
+
+    void apply_gravity_phys(PhysicalWorld &);
+    void move_forward_phys(float, PhysicalWorld&);
+    void move_right_phys(float, PhysicalWorld&);
+    void look_up_phys(float, PhysicalWorld&);
+    void look_right_phys(float, PhysicalWorld&);
+    void jump_phys(PhysicalWorld&);
+    void toggle_debug_mode();
 
     static float gravity;
 };
