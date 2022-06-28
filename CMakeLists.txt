@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.2)
 set(CMAKE_CXX_STANDARD 17)
-
+if (APPLE)
+  enable_language(OBJC)
+endif()
 project(AMC)
 
 find_package(OpenGL REQUIRED)
