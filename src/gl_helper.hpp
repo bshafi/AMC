@@ -1,5 +1,5 @@
 #pragma once
-
+#define ENABLE_IMGUI
 #include <GL/glew.h>
 
 #define SDL_MAIN_HANDLED

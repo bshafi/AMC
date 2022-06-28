@@ -1,3 +1,4 @@
+
 #include <cassert>
 #include <stdint.h>
 #include <iostream>
@@ -16,13 +17,8 @@
 #include "imgui_impl_sdl.h"
 
 void gen_main_gui(GUI &);
-int new_main();
 
-int main(const int argc, const char**) {
-    if (argc > 1) {
-        return new_main();
-    }
-
+int main() {
     SDL_Window *window = Init_SDL_and_GL();
 
     assert(window);
@@ -32,147 +28,7 @@ int main(const int argc, const char**) {
     glViewport(0, 0, width, height);
 
     GameState state = GameState::TitleScreen;
-    World world;
-    world.load("saves/save0.hex");
-    world.player.set_position(glm::vec3(0, 66, 0));
 
-    ASSERT_ON_GL_ERROR();
-    
-    GUI gui;
-    gen_main_gui(gui);
-
-    ASSERT_ON_GL_ERROR();
-
-    uint32_t ticks = SDL_GetTicks();
-    bool is_running = true;
-    std::vector<SDL_Event> events;
-    uint32_t delta_ticks;
-    float average_fps = 0.0f;
-    while (is_running) {
-        events.clear();
-        for (SDL_Event event = {}; SDL_PollEvent(&event);) {
-            ImGui_ImplSDL2_ProcessEvent(&event);
-            switch (event.type) {
-            case SDL_QUIT: 
-                is_running = false;
-                break;
-            default:
-                if (event.type == SCENE_CHANGE_EVENT) {
-                    SceneChangeData *scd = static_cast<SceneChangeData*>(event.user.data1);
-                    assert(scd);
-                    delete scd;
-                }
-            break;
-            }
-            events.push_back(event);
-        }
-
-        switch (state) {
-        case GameState::TitleScreen:
-            gui.handle_events(events);
-            if (gui.is_clicked(0)) {
-                state = GameState::GamePlay;
-            }
-            break;
-        case GameState::SaveSelect:
-            assert(false);
-            break;
-        case GameState::GamePlay:
-            world.handle_events(events);
-            break;
-        }
-
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL2_NewFrame(window);
-        ImGui::NewFrame();
-
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
-        ASSERT_ON_GL_ERROR();
-
-        switch (state) {
-        case GameState::TitleScreen:
-            gui.draw();
-            break;
-        case GameState::SaveSelect:
-            assert(false);
-            break;
-        case GameState::GamePlay:
-            world.draw();
-            break;
-        }
-
-        {
-            ImGui::Begin("Configurations");
-            if (ImGui::Button("Toggle Debug Mode")) {
-                world.player.toggle_debug_mode();
-            }
-            float position[3] = { world.player.position.x, world.player.position.y, world.player.position.z };
-            ImGui::InputFloat3("position", position);
-            float rotation[3] = { world.player.camera.pitch(), world.player.camera.yaw(), 0 };
-            ImGui::InputFloat3("rotation", rotation);
-            ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
-            if (ImGui::Button("cast ray")) {
-                std::optional<BlockHit> block_type = world.GetBlockFromRay(Ray{ world.player.camera.pos(), world.player.camera.forward() });
-                std::cout << "Block Hit ";
-                if (block_type != std::nullopt) {
-                    std::cout << static_cast<uint32_t>(world.GetBlock(*block_type)) << std::endl;
-                    std::cout << get_face_name(block_type->face) << std::endl;
-                } else {
-                    std::cout << "nullptr" << std::endl;
-                }
-            }
-            float fps = 1000.f / delta_ticks;
-            ImGui::InputFloat("FPS", &fps);
-            average_fps = 1.25f * fps + (-0.25f) * average_fps;
-            float h_average_fps = average_fps;
-            ImGui::InputFloat("avg FPS", &h_average_fps);
-            ImGui::End();
-        }
-
-        ImGui::Render();
-        
-        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        SDL_GL_SwapWindow(window);
-
-        delta_ticks = SDL_GetTicks() - ticks;
-        if (delta_ticks * FPS  < 1000) {
-            SDL_Delay((1000 / FPS) - delta_ticks);
-        }
-        ticks = SDL_GetTicks();
-    }
-
-    SDL_DestroyWindow(window);
-
-    Quit_SDL_and_GL();
-#ifdef MANUAL_LEAK_CHECK
-    // After all the destructors are called this function will run
-    atexit([](){
-        std::cout << "pointers size: " << pointers.size() << "\n";
-        for (auto &[p, loc] : pointers) {
-            auto &[file_name, line] = loc;
-            std::cout << file_name << ": " << line << " Not freed" << std::endl;
-        }
-    });
-#endif
-}
-
-int new_main() {
-
-    SDL_Window *window = Init_SDL_and_GL();
-
-    assert(window);
-
-    int width, height;
-    SDL_GL_GetDrawableSize(window, &width, &height);
-    glViewport(0, 0, width, height);
-
-    GameState state = GameState::TitleScreen;
-    /*
-    World world;
-    world.load("saves/save0.hex");
-    world.player.set_position(glm::vec3(0, 66, 0));
-    */
     PhysicalWorld phys;
     phys.load("saves/save0.hex");
     phys.player.set_position(glm::vec3(0, 66, 0));
@@ -193,7 +49,9 @@ int new_main() {
     while (is_running) {
         events.clear();
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
-            //ImGui_ImplSDL2_ProcessEvent(&event);
+#ifdef ENABLE_IMGUI
+            ImGui_ImplSDL2_ProcessEvent(&event);
+#endif
             switch (event.type) {
             case SDL_QUIT: 
                 is_running = false;
@@ -222,13 +80,13 @@ int new_main() {
         case GameState::GamePlay:
             phys.handle_events(events);
             rend.handle_events(events);
-            //world.handle_events(events);
             break;
         }
-
-        //ImGui_ImplOpenGL3_NewFrame();
-        //ImGui_ImplSDL2_NewFrame(window);
-        //ImGui::NewFrame();
+#ifdef ENABLE_IMGUI
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL2_NewFrame(window);
+    ImGui::NewFrame();
+#endif
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
@@ -243,26 +101,24 @@ int new_main() {
             break;
         case GameState::GamePlay:
             rend.draw(phys);
-            //world.draw();
             break;
         }
-
-        /*
+#ifdef ENABLE_IMGUI
         {
             ImGui::Begin("Configurations");
             if (ImGui::Button("Toggle Debug Mode")) {
-                world.player.toggle_debug_mode(world);
+                phys.player.toggle_debug_mode();
             }
-            float position[3] = { world.player.position.x, world.player.position.y, world.player.position.z };
+            float position[3] = { phys.player.position.x, phys.player.position.y, phys.player.position.z };
             ImGui::InputFloat3("position", position);
-            float rotation[3] = { world.player.camera.pitch(), world.player.camera.yaw(), 0 };
+            float rotation[3] = { phys.player.camera.pitch(), phys.player.camera.yaw(), 0 };
             ImGui::InputFloat3("rotation", rotation);
-            ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
+            ImGui::DragFloat("gravity", &phys.player.gravity, 0.1f, 1.0f, 8.0f);
             if (ImGui::Button("cast ray")) {
-                std::optional<BlockHit> block_type = world.GetBlockFromRay(Ray{ world.player.camera.pos(), world.player.camera.forward() });
+                std::optional<BlockHit> block_type = phys.GetBlockFromRay(Ray{ phys.player.camera.pos(), phys.player.camera.forward() });
                 std::cout << "Block Hit ";
                 if (block_type != std::nullopt) {
-                    std::cout << static_cast<uint32_t>(world.GetBlock(*block_type)) << std::endl;
+                    std::cout << static_cast<uint32_t>(phys.GetBlock(*block_type)) << std::endl;
                     std::cout << get_face_name(block_type->face) << std::endl;
                 } else {
                     std::cout << "nullptr" << std::endl;
@@ -279,7 +135,7 @@ int new_main() {
         ImGui::Render();
         
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-        */
+#endif
         SDL_GL_SwapWindow(window);
 
         delta_ticks = SDL_GetTicks() - ticks;

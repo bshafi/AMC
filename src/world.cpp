@@ -810,6 +810,34 @@ void RenderWorld::draw(PhysicalWorld &phys) {
     phys.inventory.draw(frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) }, 0);
 
     ASSERT_ON_GL_ERROR();
+
+#ifdef ENABLE_IMGUI
+    ImGui::Begin("World");
+    ImGui::DragFloat("frequency", &phys.frequency, 1.0f, 10.0f);
+    ImGui::DragInt("octaves", &phys.octaves, 0, 20);
+    if (ImGui::Button("regenerate")) {
+        phys.generate();
+    }
+    if (ImGui::Button("toggle debug mode")) {
+        phys.player.debug_mode = !phys.player.debug_mode;
+    }
+    ImGui::DragFloat("gravity", &Player::gravity, 0.0f, 10.0f);
+    ImGui::DragFloat("movement_speed", &Player::movement_speed, 0.0f, 10.0f);
+    ImGui::DragFloat("jump_speed", &Player::jump_speed, 0.0f, 10.0f);
+    if (phys.selected_block != std::nullopt) {
+        int block_type = static_cast<int>(phys.GetBlock(*phys.selected_block));
+        ImGui::InputInt("block type", &block_type);
+        int block_pos[] = { phys.selected_block->block_pos.x, phys.selected_block->block_pos.y, phys.selected_block->block_pos.z };
+        int chunk_pos[] = { phys.selected_block->chunk_pos.x, phys.selected_block->chunk_pos.y };
+        ImGui::InputInt3("block_pos", block_pos);
+        ImGui::InputInt2("chunk_pos", chunk_pos);
+        float block_damage = static_cast<float>(phys.selected_block_damage) / phys.BLOCK_DURABILITY;
+        ImGui::InputFloat("block_damage", &block_damage);
+    } else {
+        ImGui::LabelText("No block selected", "");
+    }
+    ImGui::End();
+#endif
 }
 
 RenderWorld::RenderWorld(PhysicalWorld &phys) : 

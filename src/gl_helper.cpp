@@ -91,13 +91,14 @@ SDL_Window *Init_SDL_and_GL() {
     );
 
     filter_data.filter_mutex.lock();
+#ifdef ENABLE_IMGUI
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     auto io = ImGui::GetIO();
     ImGui::StyleColorsDark();
     ImGui_ImplSDL2_InitForOpenGL(window, filter_data.context);
     ImGui_ImplOpenGL3_Init("#version 150");
-
+#endif
     filter_data.filter_mutex.unlock();
 
     Renderer::Initialize();
@@ -105,9 +106,11 @@ SDL_Window *Init_SDL_and_GL() {
     return window;
 }
 void Quit_SDL_and_GL() {
+#ifdef ENABLE_IMGUI
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
+#endif
 
     Renderer::Terminate();
 
