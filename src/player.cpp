@@ -18,7 +18,6 @@ void Player::set_position(const glm::vec3 &pos) {
     camera.pos(pos + glm::vec3(0, 1, 0));
 }
 
-// FIXME: The y velocity is nonzero when the player is not falling
 void Player::apply_gravity(PhysicalWorld &w, float delta_time_s) {
     if (!debug_mode) {
         auto position_copy = this->position;
@@ -26,11 +25,6 @@ void Player::apply_gravity(PhysicalWorld &w, float delta_time_s) {
 
         this->velocity = velocity_copy + glm::vec3(0, -gravity * delta_time_s, 0);
         set_position(w.try_move_to(position_copy, velocity_copy, this->aabb));
-        
-        // uses this->velocity instead of velocity_copy because the 
-        if (w.intersects_block(position_copy + this->velocity * delta_time_s, this->aabb)) {
-            velocity *= glm::vec3(1, 0, 1); // zero the vertical velocity
-        }
     }
 
     AABB feet_aabb = {
