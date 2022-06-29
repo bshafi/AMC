@@ -62,11 +62,8 @@ void Player::look_right(float f, PhysicalWorld &w) {
     this->camera.rotate_right(f);
 }
 void Player::jump(PhysicalWorld &w) {
-    if (/*fabs(this->velocity.y) < 0.1 || */on_ground) {
-        //this->velocity.y = .8f;
+    if (on_ground) {
         this->velocity.y = jump_speed;
-    } else {
-        std::cout << "y velocity was " << velocity.y << std::endl;
     }
 }
 
