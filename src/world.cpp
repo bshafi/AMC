@@ -18,7 +18,7 @@ glm::vec3 PhysicalWorld::try_move_to(const glm::vec3 &pos, const glm::vec3 &delt
     glm::vec3 new_pos = pos;
     glm::vec3 components[] = { glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1) };
     for (int i = 0; i < 3; ++i) {
-        if (!this->intersects_block(pos + delta_pos * components[i], AABB(1.f, 2.f, 1.f))) {
+        if (!this->intersects_block(pos + delta_pos * components[i], aabb)) {
             new_pos += delta_pos * components[i];
         }
     }
