@@ -1,8 +1,12 @@
+
 #include <cassert>
 #include <stdint.h>
 #include <iostream>
 #include <vector>
 #include <map>
+#include <atomic>
+#include <mutex>
+#include <thread>
 
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
@@ -15,7 +19,23 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
 
-int main(const int, const char**) {
+#define NUM_EVENTS 128
+
+SDL_Event queue_a[NUM_EVENTS] = {};
+size_t queue_a_size = 0;
+std::atomic_int queue_a_lock = 0;
+//std::mutex queue_a_lock;
+
+SDL_Event queue_b[NUM_EVENTS] = {};
+size_t queue_b_size = 0;
+std::atomic_int queue_b_lock = 0;
+//std::mutex queue_b_lock;
+
+void gen_main_gui(GUI &);
+
+void simulation_main(const GameState &, PhysicalWorld &phys);
+
+int main() {
     SDL_Window *window = Init_SDL_and_GL();
 
     assert(window);
@@ -25,49 +45,32 @@ int main(const int, const char**) {
     glViewport(0, 0, width, height);
 
     GameState state = GameState::TitleScreen;
-    World world;
-    world.load("saves/save0.hex");
-    world.player.set_position(glm::vec3(0, 66, 0));
+
+    PhysicalWorld phys;
+    phys.load("saves/save0.hex");
+    phys.player.set_position(glm::vec3(0, 66, 0));
+    RenderWorld rend(phys);
 
     ASSERT_ON_GL_ERROR();
     
+    std::thread simulation_thread(simulation_main, std::ref(state), std::ref(phys));
+
     GUI gui;
-    {
-        auto *title_background = new Texture("resources/title_image.png");
-        ADD_POINTER(title_background);
-        auto *title_text = new Texture("resources/title.png");
-        ADD_POINTER(title_text);
-        auto *play_button = new Texture("resources/play_button.png");
-        ADD_POINTER(play_button);
-        auto *title_text_sprite = new GUIImage(*title_text);
-        ADD_POINTER(title_text_sprite);
-        const auto play_button_rect = frect{ 0, 0, static_cast<float>(play_button->width()), static_cast<float>(play_button->height()) };
-        const auto play_button_normal = frect{ 0, 0, play_button_rect.w, play_button_rect.h / 2 };
-        const auto play_button_hover = frect{ 0, play_button_rect.h / 2, play_button_rect.w, play_button_rect.h / 2 };
-        auto *play_button_sprite = new Button(*play_button, play_button_normal, play_button_hover);
-        ADD_POINTER(play_button_sprite);
-        auto *title_background_sprite = new GUIImage(*title_background, true);
-        ADD_POINTER(title_background_sprite);
-        auto *things = new HBisection(GUI::Padding(title_text_sprite, 0.1), GUI::VPadding(play_button_sprite, 0.2));
-        ADD_POINTER(things);
-        GUIElement *root = new ZStack(std::vector<GUIElement*>{ title_background_sprite, things });
-        ADD_POINTER(root);
-        std::vector<Texture*> texs = { title_text, play_button, title_background };
-        gui.set_textures(texs);
-        gui.set_root(&root);
-    }
+    gen_main_gui(gui);
 
     ASSERT_ON_GL_ERROR();
 
     uint32_t ticks = SDL_GetTicks();
     bool is_running = true;
     std::vector<SDL_Event> events;
-    uint32_t delta_ticks;
+    uint32_t delta_ticks = 1000 / FPS;
     float average_fps = 0.0f;
     while (is_running) {
         events.clear();
         for (SDL_Event event = {}; SDL_PollEvent(&event);) {
+#ifdef ENABLE_IMGUI
             ImGui_ImplSDL2_ProcessEvent(&event);
+#endif
             switch (event.type) {
             case SDL_QUIT: 
                 is_running = false;
@@ -82,6 +85,20 @@ int main(const int, const char**) {
             }
             events.push_back(event);
         }
+        {
+            int expected = 0;
+            if (queue_a_lock.compare_exchange_weak(expected, 1)) {
+                queue_a_size = std::min(events.size(), (size_t)NUM_EVENTS);
+                memcpy(queue_a, events.data(), queue_a_size * sizeof(SDL_Event));
+                queue_a_lock.store(2);
+            }
+            expected = 0;
+            if (queue_b_lock.compare_exchange_weak(expected, 1)) {
+                queue_b_size = std::min(events.size(), (size_t)NUM_EVENTS);
+                memcpy(queue_b, events.data(), queue_a_size * sizeof(SDL_Event));
+                queue_b_lock.store(2);
+            }
+        }
 
         switch (state) {
         case GameState::TitleScreen:
@@ -94,13 +111,15 @@ int main(const int, const char**) {
             assert(false);
             break;
         case GameState::GamePlay:
-            world.handle_events(events);
+            //phys.handle_events(events);
+            rend.handle_events(events);
             break;
         }
-
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplSDL2_NewFrame(window);
-        ImGui::NewFrame();
+#ifdef ENABLE_IMGUI
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL2_NewFrame(window);
+    ImGui::NewFrame();
+#endif
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
@@ -114,25 +133,25 @@ int main(const int, const char**) {
             assert(false);
             break;
         case GameState::GamePlay:
-            world.draw();
+            rend.draw(phys);
             break;
         }
-
+#ifdef ENABLE_IMGUI
         {
             ImGui::Begin("Configurations");
             if (ImGui::Button("Toggle Debug Mode")) {
-                world.player.toggle_debug_mode(world);
+                phys.player.toggle_debug_mode();
             }
-            float position[3] = { world.player.position.x, world.player.position.y, world.player.position.z };
+            float position[3] = { phys.player.position.x, phys.player.position.y, phys.player.position.z };
             ImGui::InputFloat3("position", position);
-            float rotation[3] = { world.player.camera.pitch(), world.player.camera.yaw(), 0 };
+            float rotation[3] = { phys.player.camera.pitch(), phys.player.camera.yaw(), 0 };
             ImGui::InputFloat3("rotation", rotation);
-            ImGui::DragFloat("gravity", &world.player.gravity, 0.1f, 1.0f, 8.0f);
+            ImGui::DragFloat("gravity", &phys.player.gravity, 0.1f, 1.0f, 8.0f);
             if (ImGui::Button("cast ray")) {
-                std::optional<BlockHit> block_type = world.GetBlockFromRay(Ray{ world.player.camera.pos(), world.player.camera.forward() });
+                std::optional<BlockHit> block_type = phys.GetBlockFromRay(Ray{ phys.player.camera.pos(), phys.player.camera.forward() });
                 std::cout << "Block Hit ";
                 if (block_type != std::nullopt) {
-                    std::cout << static_cast<uint32_t>(world.GetBlock(*block_type)) << std::endl;
+                    std::cout << static_cast<uint32_t>(phys.GetBlock(*block_type)) << std::endl;
                     std::cout << get_face_name(block_type->face) << std::endl;
                 } else {
                     std::cout << "nullptr" << std::endl;
@@ -149,6 +168,7 @@ int main(const int, const char**) {
         ImGui::Render();
         
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+#endif
         SDL_GL_SwapWindow(window);
 
         delta_ticks = SDL_GetTicks() - ticks;
@@ -161,14 +181,69 @@ int main(const int, const char**) {
     SDL_DestroyWindow(window);
 
     Quit_SDL_and_GL();
-#ifdef MANUAL_LEAK_CHECK
-    // After all the destructors are called this function will run
-    atexit([](){
-        std::cout << "pointers size: " << pointers.size() << "\n";
-        for (auto &[p, loc] : pointers) {
-            auto &[file_name, line] = loc;
-            std::cout << file_name << ": " << line << " Not freed" << std::endl;
+    return 0;
+}
+
+void simulation_main(const GameState &game_state, PhysicalWorld &phys) {
+    const uint32_t FPS = 60;
+    uint32_t ticks = SDL_GetTicks();
+    uint32_t delta_ticks = 1000 / FPS;
+    SDL_Delay(1000 / FPS);
+
+    std::vector<SDL_Event> events;
+    events.resize(NUM_EVENTS);
+
+    while (true) {
+        {
+            events.clear();
+            int expected = 2;
+            if (queue_a_lock.compare_exchange_weak(expected, 3)) {
+                events.resize(queue_a_size);
+                memcpy(events.data(), queue_a, queue_a_size * sizeof(SDL_Event));
+                queue_a_lock.store(0);
+            }
+            expected = 2;
+            if (queue_b_lock.compare_exchange_weak(expected, 3)) {
+                events.resize(queue_b_size);
+                memcpy(events.data(), queue_b, queue_b_size * sizeof(SDL_Event));
+                queue_b_lock.store(0);
+            }
         }
-    });
-#endif
+        if (game_state == GameState::GamePlay) {
+            phys.handle_events(events, delta_ticks / 1000.f);
+        }
+
+        delta_ticks = SDL_GetTicks() - ticks;
+        printf("%u\n", delta_ticks); fflush(stdout);
+        if (delta_ticks * FPS  < 1000) {
+            SDL_Delay((1000 / FPS) - delta_ticks);
+        }
+        delta_ticks = SDL_GetTicks() - ticks;
+        ticks = SDL_GetTicks();
+    }
+}
+
+void gen_main_gui(GUI &gui) {
+    auto *title_background = new Texture("resources/title_image.png");
+    ADD_POINTER(title_background);
+    auto *title_text = new Texture("resources/title.png");
+    ADD_POINTER(title_text);
+    auto *play_button = new Texture("resources/play_button.png");
+    ADD_POINTER(play_button);
+    auto *title_text_sprite = new GUIImage(*title_text);
+    ADD_POINTER(title_text_sprite);
+    const auto play_button_rect = frect{ 0, 0, static_cast<float>(play_button->width()), static_cast<float>(play_button->height()) };
+    const auto play_button_normal = frect{ 0, 0, play_button_rect.w, play_button_rect.h / 2 };
+    const auto play_button_hover = frect{ 0, play_button_rect.h / 2, play_button_rect.w, play_button_rect.h / 2 };
+    auto *play_button_sprite = new Button(*play_button, play_button_normal, play_button_hover);
+    ADD_POINTER(play_button_sprite);
+    auto *title_background_sprite = new GUIImage(*title_background, true);
+    ADD_POINTER(title_background_sprite);
+    auto *things = new HBisection(GUI::Padding(title_text_sprite, 0.1), GUI::VPadding(play_button_sprite, 0.2));
+    ADD_POINTER(things);
+    GUIElement *root = new ZStack(std::vector<GUIElement*>{ title_background_sprite, things });
+    ADD_POINTER(root);
+    std::vector<Texture*> texs = { title_text, play_button, title_background };
+    gui.set_textures(texs);
+    gui.set_root(&root);
 }

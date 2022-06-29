@@ -12,162 +12,9 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
 
-World::World() : 
-    orientation_texture("resources/hello_cube_orientation.png"),
-    blocks_texture("resources/blocks.png"),
-    shader("shaders/block.vert", "shaders/chunk.frag") {
-
-    ASSERT_ON_GL_ERROR();
-
-    shader.use();
-    shader.bind_texture_to_sampler_2D({
-        { "orientation", orientation_texture },
-        { "blocks", blocks_texture }
-    });
-
-    ASSERT_ON_GL_ERROR();
-
-    glGenBuffers(1, &globals_3d_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
-    glm::mat4 view = player.camera.view_matrix();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f);
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
-
-    this->shader.bind_UBO("globals_3d", 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
-
-    this->shader.bind_UBO("globals_3d", 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
-
-    ASSERT_ON_GL_ERROR();
 
 
-
-    selected_block_damage = BLOCK_DURABILITY;
-}
-World::~World() {
-    this->save(save_name);
-
-    ASSERT_ON_GL_ERROR();
-
-    glDeleteBuffers(1, &globals_3d_ubo);
-
-    ASSERT_ON_GL_ERROR();
-}
-
-void World::handle_events(const std::vector<SDL_Event> &events) {
-    ASSERT_ON_GL_ERROR();
-
-    for (const auto event : events) {
-        switch (event.type) {
-        case SDL_WINDOWEVENT: {
-            switch (event.window.type) {
-            case SDL_WINDOWEVENT_RESIZED: {
-                glViewport(0, 0, event.window.data1, event.window.data2);
-                glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-                glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_DYNAMIC_DRAW);
-                glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(event.window.data1) / event.window.data2, 0.1f, 100.f);
-                glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
-            }
-                break;
-            default:
-                break;
-            }
-        }
-            break;
-        default:
-            break;
-        }
-        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_E) {
-            inventory.toggle();
-            SDL_SetRelativeMouseMode(!inventory.is_open() ? SDL_TRUE : SDL_FALSE);
-        }
-        if (inventory.is_open()) {
-            const auto outer = frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) };
-            inventory.handle_events(event, outer, 0);
-
-            if (event.type == SDL_MOUSEBUTTONDOWN) {
-            }
-        } else {
-            if (event.type == SDL_MOUSEBUTTONDOWN && SDL_GetRelativeMouseMode() == SDL_FALSE && event.button.button == SDL_BUTTON_LEFT) {
-                SDL_SetRelativeMouseMode(SDL_TRUE);
-            }
-            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
-
-            }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
-                SDL_SetRelativeMouseMode(SDL_FALSE);
-            }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
-                player.jump(*this);
-            }
-            if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
-                player.look_right(M_PI * event.motion.xrel / 1000.0f, *this);
-                player.look_up(-M_PI * event.motion.yrel / 1000.0f, *this);
-            }
-        }
-
-        ASSERT_ON_GL_ERROR();
-    }
-
-    const float speed = 0.4f;
-
-    if (!inventory.is_open()) {
-        const auto keypresses = SDL_GetKeyboardState(NULL);
-        if (keypresses[SDL_SCANCODE_A]) {
-            player.move_right(-speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_D]) {
-            player.move_right(speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_S]) {
-            player.move_forward(-speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_W]) {
-            player.move_forward(speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_F3]) {
-            player.toggle_debug_mode(*this);
-        }
-    }
-    player.apply_gravity(*this);
-
-    const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
-    if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-        auto new_block = GetBlockFromRay(Ray{ player.camera.pos(), player.camera.forward() });
-        if (selected_block != std::nullopt &&
-            new_block->chunk_pos == selected_block->chunk_pos &&
-            new_block->block_pos == selected_block->block_pos
-        ) {
-            this->selected_block = new_block;
-            selected_block_damage -= (10 * BLOCK_DURABILITY) / FPS;
-            if (selected_block_damage < 0) {
-                SetBlock(*selected_block, BlockType::Air);
-
-                auto loc = meshes.find(new_block->chunk_pos);
-                if (loc != meshes.end()) {
-                    loc->second = MeshBuffer(BlockMesh::Generate(chunks[new_block->chunk_pos]));
-                }
-            }
-        } else {
-            this->selected_block = new_block;
-            selected_block_damage = BLOCK_DURABILITY;
-        }
-    }
-}
-
-bool World::intersects_block(const glm::vec3 &pos, const AABB &aabb) const {
-    for (const auto &[chunk_pos, chunk] : this->chunks) {
-        if (chunk.intersects(pos, aabb)) {
-            return true;
-        }
-    }
-    return false;
-}
-
-glm::vec3 World::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const {
+glm::vec3 PhysicalWorld::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const {
     glm::vec3 new_pos = pos;
     glm::vec3 components[] = { glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1) };
     for (int i = 0; i < 3; ++i) {
@@ -176,6 +23,14 @@ glm::vec3 World::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, c
         }
     }
     return new_pos;
+}
+bool PhysicalWorld::intersects_block(const glm::vec3 &pos, const AABB &aabb) const {
+    for (const auto &[chunk_pos, chunk] : this->chunks) {
+        if (chunk.intersects(pos, aabb)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 BlockHit::Face get_hit_face(const glm::vec3 &hit_pos, const glm::ivec3 &block_location) {
@@ -218,7 +73,8 @@ BlockHit::Face get_hit_face(const glm::vec3 &hit_pos, const glm::ivec3 &block_lo
     }
 }
 
-std::optional<BlockHit> World::GetBlockFromRay(const Ray &ray) {
+
+std::optional<BlockHit> PhysicalWorld::GetBlockFromRay(const Ray &ray) {
     float min_t = std::numeric_limits<float>::infinity();
     std::optional<BlockHit> block = std::nullopt;
     glm::ivec3 location;
@@ -237,108 +93,103 @@ std::optional<BlockHit> World::GetBlockFromRay(const Ray &ray) {
     }
     return block;
 }
-BlockType World::GetBlock(const BlockHit &block_handle) {
+BlockType PhysicalWorld::GetBlock(const BlockHit &block_handle) {
     return chunks[block_handle.chunk_pos].GetBlock(block_handle.block_pos);
 }
-void World::SetBlock(const BlockHit &block_handle, BlockType type) {
+void PhysicalWorld::SetBlock(const BlockHit &block_handle, BlockType type) {
     chunks[block_handle.chunk_pos].GetBlock(block_handle.block_pos) = type;
 }
 
-void World::draw() {
-    ASSERT_ON_GL_ERROR();
-     
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glm::mat4 view = player.camera.view_matrix();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    
-    ASSERT_ON_GL_ERROR();
 
-    shader.bind_texture_to_sampler_2D({
-        { "orientation", orientation_texture },
-        { "blocks", blocks_texture }
-    });
-    shader.bind_texture_to_sampler_2D({
-        { "orientation", orientation_texture },
-        { "blocks", blocks_texture }
-    });
-
-    shader.use();
-
-    float RENDER_DISTANCE = World::RENDER_DISTANCE * Chunk::CHUNK_WIDTH;
-    /*
-    for (auto &[chunk_pos, chunk] : chunks) {
-        ASSERT_ON_GL_ERROR();
-
-        if (glm::length(glm::vec2(player.position.x, player.position.z) - glm::vec2(chunk.world_pos().x, chunk.world_pos().z)) >= RENDER_DISTANCE) {
-            continue;
+void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float delta_time_s) {
+    for (const auto &event : events) {
+        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_E) {
+            inventory.toggle();
+            SDL_SetRelativeMouseMode(!inventory.is_open() ? SDL_TRUE : SDL_FALSE);
         }
+        if (inventory.is_open()) {
+            const auto outer = frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) };
+            inventory.handle_events(event, outer, 0);
 
-        shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
-        if (selected_block != std::nullopt && selected_block->chunk_pos == chunk_pos) {
-            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(selected_block->block_pos);
+            if (event.type == SDL_MOUSEBUTTONDOWN) {
+            }
         } else {
-            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(glm::ivec3(1, 1, 1) * INT32_MIN);
+            if (event.type == SDL_MOUSEBUTTONDOWN && SDL_GetRelativeMouseMode() == SDL_FALSE && event.button.button == SDL_BUTTON_LEFT) {
+                SDL_SetRelativeMouseMode(SDL_TRUE);
+            }
+            if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
+
+            }
+            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
+                SDL_SetRelativeMouseMode(SDL_FALSE);
+            }
+            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+                player.jump(*this);
+            }
+            if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
+                player.look_right(0.25f * M_PI * event.motion.xrel * delta_time_s, *this);
+                player.look_up(-0.25f * M_PI * event.motion.yrel * delta_time_s, *this);
+            }
         }
-
-        glBindBuffer(GL_ARRAY_BUFFER, block_ids_VBO);
-        glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(BlockType) * Chunk::BLOCKS_IN_CHUNK, chunk.blocks.data());
-
-        glBindVertexArray(VAO);
-        glDrawArraysInstanced(GL_TRIANGLES, 0, cube_vertices.size() / 5, Chunk::BLOCKS_IN_CHUNK);
-        
-        ASSERT_ON_GL_ERROR();
     }
-    */
-    for (auto &[chunk_pos, mesh_buffer] : this->meshes) {
-        if (glm::length(glm::vec2(player.position.x, player.position.z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
-            continue;
+
+
+    const float speed = 100.f * delta_time_s;
+
+    if (!inventory.is_open()) {
+        const auto keypresses = SDL_GetKeyboardState(NULL);
+        if (keypresses[SDL_SCANCODE_A]) {
+            player.move_right(-speed, *this);
         }
-        shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
-        if (selected_block != std::nullopt && selected_block->chunk_pos == chunk_pos) {
-            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(selected_block->block_pos);
+        if (keypresses[SDL_SCANCODE_D]) {
+            player.move_right(speed, *this);
+        }
+        if (keypresses[SDL_SCANCODE_S]) {
+            player.move_forward(-speed, *this);
+        }
+        if (keypresses[SDL_SCANCODE_W]) {
+            player.move_forward(speed, *this);
+        }
+        if (keypresses[SDL_SCANCODE_F3]) {
+            player.toggle_debug_mode();
+        }
+    }
+    player.apply_gravity(*this, delta_time_s);
+
+    const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
+    if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
+        auto new_block = GetBlockFromRay(Ray{ player.camera.pos(), player.camera.forward() });
+        if (selected_block != std::nullopt &&
+            new_block->chunk_pos == selected_block->chunk_pos &&
+            new_block->block_pos == selected_block->block_pos
+        ) {
+            this->selected_block = new_block;
+            selected_block_damage -= (10 * BLOCK_DURABILITY) / FPS;
+            if (selected_block_damage < 0) {
+                SetBlock(*selected_block, BlockType::Air);
+                /* TODO: FIXME When blocks change request a change in the renderer somehow
+                auto loc = meshes.find(new_block->chunk_pos);
+                if (loc != meshes.end()) {
+                    loc->second = MeshBuffer(BlockMesh::Generate(chunks[new_block->chunk_pos]));
+                }
+                */
+            }
         } else {
-            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(glm::ivec3(1, 1, 1) * INT32_MIN);
+            this->selected_block = new_block;
+            selected_block_damage = BLOCK_DURABILITY;
         }
-
-        mesh_buffer.draw();
     }
-
-    glBindVertexArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
-
-    inventory.draw(frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) }, 0);
-
-    ASSERT_ON_GL_ERROR();
-
-    ImGui::Begin("World");
-    ImGui::DragFloat("frequency", &frequency, 1.0f, 10.0f);
-    ImGui::DragInt("octaves", &octaves, 0, 20);
-    if (ImGui::Button("regenerate")) {
-        this->generate();
-    }
-    if (ImGui::Button("toggle debug mode")) {
-        player.debug_mode = !player.debug_mode;
-    }
-    ImGui::DragFloat("gravity", &Player::gravity, 0.0f, 10.0f);
-    ImGui::DragFloat("movement_speed", &Player::movement_speed, 0.0f, 10.0f);
-    ImGui::DragFloat("jump_speed", &Player::jump_speed, 0.0f, 10.0f);
-    if (selected_block != std::nullopt) {
-        int block_type = static_cast<int>(GetBlock(*selected_block));
-        ImGui::InputInt("block type", &block_type);
-        int block_pos[] = { selected_block->block_pos.x, selected_block->block_pos.y, selected_block->block_pos.z };
-        int chunk_pos[] = { selected_block->chunk_pos.x, selected_block->chunk_pos.y };
-        ImGui::InputInt3("block_pos", block_pos);
-        ImGui::InputInt2("chunk_pos", chunk_pos);
-        float block_damage = static_cast<float>(selected_block_damage) / BLOCK_DURABILITY;
-        ImGui::InputFloat("block_damage", &block_damage);
-    } else {
-        ImGui::LabelText("No block selected", "");
-    }
-    ImGui::End();
 }
 
-void World::generate(uint32_t seed) noexcept {
+PhysicalWorld::PhysicalWorld() {
+    selected_block_damage = BLOCK_DURABILITY;
+}
+PhysicalWorld::~PhysicalWorld() {
+    this->save(save_name);
+}
+
+
+void PhysicalWorld::generate(uint32_t seed) noexcept {
     this->chunks.clear();
 
     siv::PerlinNoise noise(seed);
@@ -370,13 +221,12 @@ void World::generate(uint32_t seed) noexcept {
         }
         chunk.chunk_pos = glm::ivec2(i, j);
         chunks.emplace(std::make_pair<glm::ivec2, Chunk>(glm::ivec2(chunk.chunk_pos), std::move(chunk)));
-        meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk.chunk_pos), (MeshBuffer(BlockMesh::Generate(chunk)))));
     }
 }
 
 
 
-void World::load(const std::string &path) {
+void PhysicalWorld::load(const std::string &path) {
     this->chunks.clear();
     this->save_name = path;
 
@@ -391,7 +241,7 @@ void World::load(const std::string &path) {
         };
 
         const uint32_t version = read_binary<uint32_t>(file);
-        assert(version == World::WORLD_VERSION);
+        assert(version == PhysicalWorld::WORLD_VERSION);
         const uint32_t chunks_count = read_binary<uint32_t>(file);
 
         //this->chunks.reserve(chunks_count);
@@ -421,7 +271,6 @@ void World::load(const std::string &path) {
             }
             pad16();
             chunks.emplace(std::make_pair<glm::ivec2, Chunk>(glm::ivec2(chunk.chunk_pos), std::move(chunk)));
-            meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk.chunk_pos), (MeshBuffer(BlockMesh::Generate(chunk)))));
         }
 
         file.close();
@@ -429,10 +278,10 @@ void World::load(const std::string &path) {
         std::cout << "File could not open: " << error.what() << std::endl;
         std::cout << "Generating new world instead" << std::endl;
 
-        return World::generate();
+        return PhysicalWorld::generate();
     }
 }
-void World::save(const std::string &path) const {
+void PhysicalWorld::save(const std::string &path) const {
     try {
         std::ofstream file(path, std::ios_base::binary);
         file.exceptions(~std::ios_base::goodbit);
@@ -489,4 +338,133 @@ void World::save(const std::string &path) const {
     }
 }
 
+void RenderWorld::handle_events(const std::vector<SDL_Event> &events) {
+    for (const auto &event : events) { 
+        if (event.type == SDL_WINDOWEVENT_RESIZED) {
+            glViewport(0, 0, event.window.data1, event.window.data2);
+            glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
+            glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_DYNAMIC_DRAW);
+            glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(event.window.data1) / event.window.data2, 0.1f, 100.f);
+            glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
+        }
+        ASSERT_ON_GL_ERROR();
+    }
+}
+void RenderWorld::draw(PhysicalWorld &phys) {
+    for (const auto &[key, chunk] : phys.chunks) {
+        if (meshes.find(key) == meshes.end()) {
+            meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk.chunk_pos), (MeshBuffer(BlockMesh::Generate(chunk)))));
+        }
+    }
 
+    ASSERT_ON_GL_ERROR();
+     
+    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
+    glm::mat4 view = phys.player.camera.view_matrix();
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+    
+    ASSERT_ON_GL_ERROR();
+
+    shader.bind_texture_to_sampler_2D({
+        { "orientation", orientation_texture },
+        { "blocks", blocks_texture }
+    });
+    shader.bind_texture_to_sampler_2D({
+        { "orientation", orientation_texture },
+        { "blocks", blocks_texture }
+    });
+
+    shader.use();
+
+    float RENDER_DISTANCE = PhysicalWorld::RENDER_DISTANCE * Chunk::CHUNK_WIDTH;
+
+    for (auto &[chunk_pos, mesh_buffer] : this->meshes) {
+        if (glm::length(glm::vec2(phys.player.position.x, phys.player.position.z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
+            continue;
+        }
+        shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
+        if (phys.selected_block != std::nullopt && phys.selected_block->chunk_pos == chunk_pos) {
+            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(phys.selected_block->block_pos);
+        } else {
+            shader.retrieve_shader_variable<glm::ivec3>("selected_block").set(glm::ivec3(1, 1, 1) * INT32_MIN);
+        }
+
+        mesh_buffer.draw();
+    }
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    phys.inventory.draw(frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) }, 0);
+
+    ASSERT_ON_GL_ERROR();
+
+#ifdef ENABLE_IMGUI
+    ImGui::Begin("World");
+    ImGui::DragFloat("frequency", &phys.frequency, 1.0f, 10.0f);
+    ImGui::DragInt("octaves", &phys.octaves, 0, 20);
+    if (ImGui::Button("regenerate")) {
+        phys.generate();
+    }
+    if (ImGui::Button("toggle debug mode")) {
+        phys.player.debug_mode = !phys.player.debug_mode;
+    }
+    ImGui::DragFloat("gravity", &Player::gravity, 0.0f, 10.0f);
+    ImGui::DragFloat("movement_speed", &Player::movement_speed, 0.0f, 10.0f);
+    ImGui::DragFloat("jump_speed", &Player::jump_speed, 0.0f, 10.0f);
+    if (phys.selected_block != std::nullopt) {
+        int block_type = static_cast<int>(phys.GetBlock(*phys.selected_block));
+        ImGui::InputInt("block type", &block_type);
+        int block_pos[] = { phys.selected_block->block_pos.x, phys.selected_block->block_pos.y, phys.selected_block->block_pos.z };
+        int chunk_pos[] = { phys.selected_block->chunk_pos.x, phys.selected_block->chunk_pos.y };
+        ImGui::InputInt3("block_pos", block_pos);
+        ImGui::InputInt2("chunk_pos", chunk_pos);
+        float block_damage = static_cast<float>(phys.selected_block_damage) / phys.BLOCK_DURABILITY;
+        ImGui::InputFloat("block_damage", &block_damage);
+    } else {
+        ImGui::LabelText("No block selected", "");
+    }
+    ImGui::End();
+#endif
+}
+
+RenderWorld::RenderWorld(PhysicalWorld &phys) : 
+    orientation_texture("resources/hello_cube_orientation.png"),
+    blocks_texture("resources/blocks.png"),
+    shader("shaders/block.vert", "shaders/chunk.frag") {
+
+
+    ASSERT_ON_GL_ERROR();
+
+    shader.use();
+    shader.bind_texture_to_sampler_2D({
+        { "orientation", orientation_texture },
+        { "blocks", blocks_texture }
+    });
+
+    ASSERT_ON_GL_ERROR();
+
+    glGenBuffers(1, &globals_3d_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
+    glm::mat4 view = phys.player.camera.view_matrix();
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
+    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f);
+    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
+
+    this->shader.bind_UBO("globals_3d", 0);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
+
+    this->shader.bind_UBO("globals_3d", 0);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
+
+    ASSERT_ON_GL_ERROR();
+}
+RenderWorld::~RenderWorld() {
+    ASSERT_ON_GL_ERROR();
+
+    glDeleteBuffers(1, &globals_3d_ubo);
+
+    ASSERT_ON_GL_ERROR();
+}

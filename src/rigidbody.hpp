@@ -2,14 +2,14 @@
 
 #include "standard.hpp"
 
-struct World;
+struct PhysicalWorld;
 
 class Rigidbody {
 public:
     Rigidbody();
 
     void apply_impulse(const glm::vec3 &force);
-    void update_pos(glm::vec3 &pos, World &world, const float delta_time);
+    void update_pos(glm::vec3 &pos, PhysicalWorld &world, const float delta_time);
 
     AABB aabb;
     float mass;
