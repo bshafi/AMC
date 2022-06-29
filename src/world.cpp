@@ -101,7 +101,7 @@ void PhysicalWorld::SetBlock(const BlockHit &block_handle, BlockType type) {
 }
 
 
-void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events) {
+void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float delta_time_s) {
     for (const auto &event : events) {
         if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_E) {
             inventory.toggle();
@@ -124,37 +124,37 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events) {
                 SDL_SetRelativeMouseMode(SDL_FALSE);
             }
             if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
-                player.jump_phys(*this);
+                player.jump(*this);
             }
             if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
-                player.look_right_phys(M_PI * event.motion.xrel / 1000.0f, *this);
-                player.look_up_phys(-M_PI * event.motion.yrel / 1000.0f, *this);
+                player.look_right(0.25f * M_PI * event.motion.xrel * delta_time_s, *this);
+                player.look_up(-0.25f * M_PI * event.motion.yrel * delta_time_s, *this);
             }
         }
     }
 
 
-    const float speed = 0.4f;
+    const float speed = 100.f * delta_time_s;
 
     if (!inventory.is_open()) {
         const auto keypresses = SDL_GetKeyboardState(NULL);
         if (keypresses[SDL_SCANCODE_A]) {
-            player.move_right_phys(-speed, *this);
+            player.move_right(-speed, *this);
         }
         if (keypresses[SDL_SCANCODE_D]) {
-            player.move_right_phys(speed, *this);
+            player.move_right(speed, *this);
         }
         if (keypresses[SDL_SCANCODE_S]) {
-            player.move_forward_phys(-speed, *this);
+            player.move_forward(-speed, *this);
         }
         if (keypresses[SDL_SCANCODE_W]) {
-            player.move_forward_phys(speed, *this);
+            player.move_forward(speed, *this);
         }
         if (keypresses[SDL_SCANCODE_F3]) {
             player.toggle_debug_mode();
         }
     }
-    player.apply_gravity_phys(*this);
+    player.apply_gravity(*this, delta_time_s);
 
     const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
     if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {

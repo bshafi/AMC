@@ -4,6 +4,9 @@
 #include <iostream>
 #include <vector>
 #include <map>
+#include <atomic>
+#include <mutex>
+#include <thread>
 
 #include "gl_helper.hpp"
 #include "hello_cube.hpp"
@@ -16,8 +19,21 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
 
+#define NUM_EVENTS 128
+
+SDL_Event queue_a[NUM_EVENTS] = {};
+size_t queue_a_size = 0;
+std::atomic_int queue_a_lock = 0;
+//std::mutex queue_a_lock;
+
+SDL_Event queue_b[NUM_EVENTS] = {};
+size_t queue_b_size = 0;
+std::atomic_int queue_b_lock = 0;
+//std::mutex queue_b_lock;
+
 void gen_main_gui(GUI &);
 
+void simulation_main(const GameState &, PhysicalWorld &phys);
 
 int main() {
     SDL_Window *window = Init_SDL_and_GL();
@@ -37,6 +53,8 @@ int main() {
 
     ASSERT_ON_GL_ERROR();
     
+    std::thread simulation_thread(simulation_main, std::ref(state), std::ref(phys));
+
     GUI gui;
     gen_main_gui(gui);
 
@@ -45,7 +63,7 @@ int main() {
     uint32_t ticks = SDL_GetTicks();
     bool is_running = true;
     std::vector<SDL_Event> events;
-    uint32_t delta_ticks;
+    uint32_t delta_ticks = 1000 / FPS;
     float average_fps = 0.0f;
     while (is_running) {
         events.clear();
@@ -67,6 +85,20 @@ int main() {
             }
             events.push_back(event);
         }
+        {
+            int expected = 0;
+            if (queue_a_lock.compare_exchange_weak(expected, 1)) {
+                queue_a_size = std::min(events.size(), (size_t)NUM_EVENTS);
+                memcpy(queue_a, events.data(), queue_a_size * sizeof(SDL_Event));
+                queue_a_lock.store(2);
+            }
+            expected = 0;
+            if (queue_b_lock.compare_exchange_weak(expected, 1)) {
+                queue_b_size = std::min(events.size(), (size_t)NUM_EVENTS);
+                memcpy(queue_b, events.data(), queue_a_size * sizeof(SDL_Event));
+                queue_b_lock.store(2);
+            }
+        }
 
         switch (state) {
         case GameState::TitleScreen:
@@ -79,7 +111,7 @@ int main() {
             assert(false);
             break;
         case GameState::GamePlay:
-            phys.handle_events(events);
+            //phys.handle_events(events);
             rend.handle_events(events);
             break;
         }
@@ -140,7 +172,6 @@ int main() {
         SDL_GL_SwapWindow(window);
 
         delta_ticks = SDL_GetTicks() - ticks;
-        printf("%u\n", delta_ticks); fflush(stdout);
         if (delta_ticks * FPS  < 1000) {
             SDL_Delay((1000 / FPS) - delta_ticks);
         }
@@ -151,6 +182,45 @@ int main() {
 
     Quit_SDL_and_GL();
     return 0;
+}
+
+void simulation_main(const GameState &game_state, PhysicalWorld &phys) {
+    const uint32_t FPS = 60;
+    uint32_t ticks = SDL_GetTicks();
+    uint32_t delta_ticks = 1000 / FPS;
+    SDL_Delay(1000 / FPS);
+
+    std::vector<SDL_Event> events;
+    events.resize(NUM_EVENTS);
+
+    while (true) {
+        {
+            events.clear();
+            int expected = 2;
+            if (queue_a_lock.compare_exchange_weak(expected, 3)) {
+                events.resize(queue_a_size);
+                memcpy(events.data(), queue_a, queue_a_size * sizeof(SDL_Event));
+                queue_a_lock.store(0);
+            }
+            expected = 2;
+            if (queue_b_lock.compare_exchange_weak(expected, 3)) {
+                events.resize(queue_b_size);
+                memcpy(events.data(), queue_b, queue_b_size * sizeof(SDL_Event));
+                queue_b_lock.store(0);
+            }
+        }
+        if (game_state == GameState::GamePlay) {
+            phys.handle_events(events, delta_ticks / 1000.f);
+        }
+
+        delta_ticks = SDL_GetTicks() - ticks;
+        printf("%u\n", delta_ticks); fflush(stdout);
+        if (delta_ticks * FPS  < 1000) {
+            SDL_Delay((1000 / FPS) - delta_ticks);
+        }
+        delta_ticks = SDL_GetTicks() - ticks;
+        ticks = SDL_GetTicks();
+    }
 }
 
 void gen_main_gui(GUI &gui) {

@@ -1,7 +1,7 @@
 #include "world.hpp"
 #include "player.hpp"
 
-float Player::gravity = 0.08f;
+float Player::gravity = 9.8f;
 float Player::movement_speed = 0.7f;
 float Player::jump_speed = 0.5f;
 
@@ -9,6 +9,7 @@ Player::Player() {
     debug_mode = true;
     aabb = { 0.9, 2, 0.9 };
     velocity = glm::vec3(0, 0, 0);
+    on_ground = false;
 }
 
 
@@ -18,19 +19,31 @@ void Player::set_position(const glm::vec3 &pos) {
 }
 
 // FIXME: The y velocity is nonzero when the player is not falling
-void Player::apply_gravity(PhysicalWorld &w) {
+void Player::apply_gravity(PhysicalWorld &w, float delta_time_s) {
     if (!debug_mode) {
         auto position_copy = this->position;
         auto velocity_copy = this->velocity;
 
-        this->velocity = velocity_copy + glm::vec3(0, -gravity, 0);
+        this->velocity = velocity_copy + glm::vec3(0, -gravity * delta_time_s, 0);
         set_position(w.try_move_to(position_copy, velocity_copy, this->aabb));
         
         // uses this->velocity instead of velocity_copy because the 
-        if (w.intersects_block(position_copy + this->velocity, this->aabb)) {
+        if (w.intersects_block(position_copy + this->velocity * delta_time_s, this->aabb)) {
             velocity *= glm::vec3(1, 0, 1); // zero the vertical velocity
         }
     }
+
+    AABB feet_aabb = {
+        0.9f * this->aabb.width,
+        0.1f * this->aabb.height,
+        0.9f * this->aabb.length
+    };
+    glm::vec3 feet_pos = {
+        this->position.x + (0.1f * this->aabb.width / 2),
+        this->position.y + (-1.f * this->aabb.height),
+        this->position.z + (0.1f * this->aabb.length / 2)
+    };
+    on_ground = w.intersects_block(feet_pos, feet_aabb);
 }
 void Player::move_forward(float f, PhysicalWorld &w) {
     if (debug_mode) {
@@ -55,7 +68,7 @@ void Player::look_right(float f, PhysicalWorld &w) {
     this->camera.rotate_right(f);
 }
 void Player::jump(PhysicalWorld &w) {
-    if (fabs(this->velocity.y) < 0.1) {
+    if (/*fabs(this->velocity.y) < 0.1 || */on_ground) {
         //this->velocity.y = .8f;
         this->velocity.y = jump_speed;
     } else {

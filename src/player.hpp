@@ -12,6 +12,7 @@ struct Player {
     AABB aabb;
     Camera camera;
     bool debug_mode;
+    bool on_ground;
 
     static float movement_speed;
     static float jump_speed;
@@ -19,7 +20,7 @@ struct Player {
 
     void set_position(const glm::vec3 &);
 
-    void apply_gravity(PhysicalWorld &);
+    void apply_gravity(PhysicalWorld &, float delta_time_s);
     void move_forward(float, PhysicalWorld&);
     void move_right(float, PhysicalWorld&);
     void look_up(float, PhysicalWorld&);

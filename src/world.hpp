@@ -41,7 +41,7 @@ struct PhysicalWorld {
     void load(const std::string &path);
     void save(const std::string &path) const;
 
-    void handle_events(const std::vector<SDL_Event> &events);
+    void handle_events(const std::vector<SDL_Event> &events, float delta_ticks_s);
 
     PhysicalWorld();
     ~PhysicalWorld();
