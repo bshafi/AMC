@@ -18,8 +18,6 @@
 
 void gen_main_gui(GUI &);
 
-void simulation_main(const GameState &, PhysicalWorld &phys);
-
 int main() {
     SDL_Window *window = Init_SDL_and_GL();
 
