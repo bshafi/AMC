@@ -18,8 +18,6 @@
 
 void gen_main_gui(GUI &);
 
-void simulation_main(const GameState &, PhysicalWorld &phys);
-
 int main() {
     SDL_Window *window = Init_SDL_and_GL();
 
@@ -142,9 +140,10 @@ int main() {
         SDL_GL_SwapWindow(window);
 
         delta_ticks = SDL_GetTicks() - ticks;
-        if (delta_ticks * FPS  < 1000) {
+        if (delta_ticks  < 1000 / FPS) {
             SDL_Delay((1000 / FPS) - delta_ticks);
         }
+        delta_ticks = SDL_GetTicks() - ticks;
         ticks = SDL_GetTicks();
     }
 

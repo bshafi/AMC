@@ -9,8 +9,6 @@
 #include "inventory.hpp"
 #include "mesh.hpp"
 
-#include "rigidbody.hpp"
-
 class Renderer;
 
 struct PhysicalWorld {
