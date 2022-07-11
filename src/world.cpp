@@ -7,6 +7,7 @@
 
 #include "world.hpp"
 #include "chunk.hpp"
+#include "entity.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
@@ -102,6 +103,7 @@ void PhysicalWorld::SetBlock(const BlockHit &block_handle, BlockType type) {
 
 
 void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float delta_time_s) {
+    bool space_pressed = false;
     for (const auto &event : events) {
         if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_E) {
             inventory.toggle();
@@ -117,6 +119,9 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
             if (event.type == SDL_MOUSEBUTTONDOWN && SDL_GetRelativeMouseMode() == SDL_FALSE && event.button.button == SDL_BUTTON_LEFT) {
                 SDL_SetRelativeMouseMode(SDL_TRUE);
             }
+            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_F3) {
+                player.toggle_debug_mode();
+            }
             if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
 
             }
@@ -124,7 +129,8 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
                 SDL_SetRelativeMouseMode(SDL_FALSE);
             }
             if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
-                player.jump(*this);
+                //player.jump(*this);
+                space_pressed = true;
             }
             if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
                 player.look_right(0.25f * M_PI * event.motion.xrel * delta_time_s, *this);
@@ -133,8 +139,80 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
         }
     }
 
+    
+    const auto keypresses = SDL_GetKeyboardState(NULL);
+    const float speed = 1000.f * delta_time_s;
+    vec3 movement = { 0, 0, 0 };
+    if (keypresses[SDL_SCANCODE_A]) {
+        movement = movement - player.camera.right();
+    }
+    if (keypresses[SDL_SCANCODE_D]) {
+        movement = movement + player.camera.right();
+    }
+    if (keypresses[SDL_SCANCODE_S]) {
+        movement = movement - player.camera.forward();
+    }
+    if (keypresses[SDL_SCANCODE_W]) {
+        movement = movement + player.camera.forward();
+    }
+    if (!player.debug_mode) {
+        movement = movement * vec3(1, 0, 1);
+    }
+    float mag = glm::length(movement);
+    if (mag >= 0.001f) {
+        movement = movement * speed;
+    }
 
+    std::vector<Entity> entities = {
+        {
+            {
+                player.position,
+                player.aabb
+            },
+            {
+                movement,
+                player.velocity,
+                !player.debug_mode,
+                player.on_ground
+            }
+        }
+    };
+
+/*
+
+            BoundingBox old_box = { pos, size };
+
+            new_vel = vel + acc * (dt / iterations);
+            new_pos = pos + (vel + movement) * (dt / iterations);
+
+            vec3 components[3] = { vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1) };
+            for (size_t a = 0; a < 3; ++a) {
+                BoundingBox b = {
+                    pos + components[a] * (vel + movement) * (dt / iterations),
+                    size
+                };
+                if (!rect_intersects(phys, entities, i, b)) {
+                    pos = pos + components[a] * (vel + movement) * (dt / iterations);
+                } else {
+                    vel = vel * (1.f - components[a]);
+                }
+            }
+*/
+    if (space_pressed && entities[0].rigidbody.on_ground) {
+        entities[0].rigidbody.apply_impulse(vec3(0, Player::jump_speed, 0));
+    }
+
+    update_entities(*this, entities, delta_time_s);
+
+    player.set_position(entities[0].transform.pos);
+    player.velocity = entities[0].rigidbody.vel;
+    player.on_ground = entities[0].rigidbody.on_ground;
+    
+
+    
+    /*
     const float speed = 100.f * delta_time_s;
+    const auto keypresses = SDL_GetKeyboardState(NULL);
 
     if (!inventory.is_open()) {
         const auto keypresses = SDL_GetKeyboardState(NULL);
@@ -150,9 +228,6 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
         if (keypresses[SDL_SCANCODE_W]) {
             player.move_forward(speed, *this);
         }
-        if (keypresses[SDL_SCANCODE_F3]) {
-            player.toggle_debug_mode();
-        }
     }
     player.apply_gravity(*this, delta_time_s);
 
@@ -166,19 +241,23 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
             this->selected_block = new_block;
             selected_block_damage -= (10 * BLOCK_DURABILITY) / FPS;
             if (selected_block_damage < 0) {
+                
                 SetBlock(*selected_block, BlockType::Air);
-                /* TODO: FIXME When blocks change request a change in the renderer somehow
+            
+                 TODO: FIXME When blocks change request a change in the renderer somehow
                 auto loc = meshes.find(new_block->chunk_pos);
                 if (loc != meshes.end()) {
                     loc->second = MeshBuffer(BlockMesh::Generate(chunks[new_block->chunk_pos]));
                 }
-                */
+                
+                
             }
         } else {
             this->selected_block = new_block;
             selected_block_damage = BLOCK_DURABILITY;
         }
     }
+    */
 }
 
 PhysicalWorld::PhysicalWorld() {

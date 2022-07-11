@@ -82,7 +82,7 @@ glm::vec3 roundup(const glm::vec3 &a) {
 }
 
 bool ranges_overlap(float x0, float x0_offset, float x1, float x1_offset) {
-    return (x0 <= x1 && x1 <= x0 + x0_offset) || (x0 <= x1 + x1_offset && x1 + x1_offset <= x0 + x0_offset);
+    return (x0 < x1 && x1 < x0 + x0_offset) || (x0 < x1 + x1_offset && x1 + x1_offset < x0 + x0_offset);
 }
 
 
@@ -104,7 +104,66 @@ bool BoundingBox::contains(const glm::vec3 &point) const {
     const bool z_overlap = (this->pos.z <= point.z) && (point.z <= this->pos.z + this->aabb.length);
     return x_overlap && y_overlap && z_overlap;
 }
+std::array<vec3, 8> BoundingBox::corners() const {
+    return {
+        this->pos,
+        this->pos + vec3(this->aabb.width, 0, 0),
+        this->pos + vec3(0, this->aabb.height, 0),
+        this->pos + vec3(this->aabb.width, this->aabb.height, 0),
+        this->pos + vec3(0, 0, this->aabb.length),
+        this->pos + vec3(this->aabb.width, 0, this->aabb.length),
+        this->pos + vec3(0, this->aabb.height, this->aabb.length),
+        this->pos + vec3(this->aabb.width, this->aabb.height, this->aabb.length)
+    };
+}
 
+BoundingBox BoundingBox::union_box(const BoundingBox &r) const {
+    auto l_corners = this->corners();
+    auto r_corners = r.corners();
+    vec3 points[] = {
+        l_corners[0],
+        l_corners[1],
+        l_corners[2],
+        l_corners[3],
+        l_corners[4],
+        l_corners[5],
+        l_corners[6],
+        l_corners[7],
+        r_corners[0],
+        r_corners[1],
+        r_corners[2],
+        r_corners[3],
+        r_corners[4],
+        r_corners[5],
+        r_corners[6],
+        r_corners[7],
+    };
+    float x_min = INFINITY, x_max = -INFINITY;
+    float y_min = INFINITY, y_max = -INFINITY;
+    float z_min = INFINITY, z_max = -INFINITY;
+
+    for (size_t i = 0; i < sizeof(points) / sizeof(points[0]); ++i) {
+        x_min = std::min(x_min, points[i].x);
+        x_max = std::max(x_max, points[i].x);
+        y_min = std::min(y_min, points[i].y);
+        y_max = std::max(y_max, points[i].y);
+        z_min = std::min(z_min, points[i].z);
+        z_max = std::max(z_max, points[i].z);
+    }
+
+    return BoundingBox{
+        {
+            x_min,
+            y_min,
+            z_min
+        },
+        {
+            x_max - x_min,
+            y_max - y_min,
+            z_max - z_min
+        }
+    };
+}
 namespace std {
     static uint32_t i32_to_u32(int32_t x) {
         return static_cast<uint32_t>(static_cast<int64_t>(x) - static_cast<int64_t>(INT32_MIN));
