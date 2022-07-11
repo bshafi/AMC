@@ -1,4 +1,5 @@
 #include "test_raycast.hpp"
+#include "test_intersection.hpp"
 
 #include "gtest/gtest.h"
 
