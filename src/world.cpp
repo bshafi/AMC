@@ -14,6 +14,180 @@
 #include "imgui_impl_sdl.h"
 
 
+SaveFile::SaveFile(const std::string &s)
+    : file(s, std::ios_base::in | std::ios_base::out | std::ios_base::binary) {
+    assert(file.good());
+    file.exceptions(~std::ios_base::goodbit);
+
+    if (file.seekg(0, std::ios_base::end).tellg() == 0) {
+        initialize_new_file();
+    }
+    file.seekg(std::ios_base::beg);
+
+    read_header();
+
+    bool succeeded = false;
+    do {
+        succeeded = read_table();
+        for (size_t i = 0; i < 16; ++i) {
+            skip_chunk();
+        }
+    } while (succeeded);
+}
+void SaveFile::initialize_new_file() {
+    write_header();
+    last_table = file.tellp();
+
+    for (size_t i = 0; i < 16; ++i) {
+        write_binary<int32_t>(file, INT_MIN);
+        write_binary<int32_t>(file, INT_MIN);
+    }
+    for (size_t i = 0; i < CHUNK_SIZE * 16; ++i) {
+        write_binary<uint8_t>(file, 0);
+    }
+    file.flush();
+}
+void SaveFile::pad16() {
+    while (file.tellg() % 16 != 0) {
+        write_binary<uint8_t>(file, 0);
+    }
+}
+void SaveFile::skip16() {
+    while (file.tellg() % 16 != 0) {
+        read_binary<uint8_t>(file);
+    }
+}
+void SaveFile::skip_chunk() {
+    file.seekg(file.tellg() + std::streamoff(CHUNK_SIZE));
+}
+bool SaveFile::read_header() {
+    auto prev_pos = file.tellg();
+    try {
+        const uint32_t version = read_binary<uint32_t>(file);
+        assert(version == PhysicalWorld::WORLD_VERSION);
+
+        skip16();
+        last_table = file.tellg();
+
+    } catch (std::ios_base::failure &error) {
+        std::cout << "Failed to read header: " << error.what() << std::endl;
+        file.clear();
+        file.seekg(prev_pos);
+        return false;
+    }
+    return true;
+}
+void SaveFile::write_header() {
+    auto prev_pos = file.tellg();
+
+    write_binary<uint32_t>(file, PhysicalWorld::WORLD_VERSION);
+    pad16();
+    file.flush();
+}
+bool SaveFile::read_table() {
+    auto prev_pos = file.tellg();
+    try {
+        std::array<glm::ivec2, 16> chunks;
+        for (size_t i = 0; i < chunks.size(); ++i) {
+            chunks[i].x = read_binary<int32_t>(file);
+            chunks[i].y = read_binary<int32_t>(file);
+        }
+        auto cur_pos = file.tellg();
+        for (size_t i = 0; i < chunks.size(); ++i) {
+            if (chunks[i].x != INT32_MIN && chunks[i].y != INT32_MIN) {
+                chunk_locations[chunks[i]] = cur_pos + std::streamoff(i * CHUNK_SIZE);
+            }
+        }
+    } catch (std::ios_base::failure &error) {
+        file.clear();
+        file.seekg(prev_pos);
+        return false;
+    }
+    last_table = prev_pos;
+    return true;
+}
+// returns false if chunk was not found
+bool SaveFile::read_chunk(const glm::ivec2 &pos, Chunk &chunk) {
+    auto prev_pos = file.tellg();
+    try {
+        auto loc = chunk_locations.find(pos);
+        if (loc == chunk_locations.end()) {
+            return false;
+        }
+        file.seekg(loc->second);
+        for(auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
+            uint8_t block = read_binary<uint8_t>(file);
+            chunk.GetBlock(pos) = static_cast<BlockType>(static_cast<uint32_t>(block));
+        }
+        chunk.chunk_pos = pos;
+    } catch (std::ios_base::failure &error) {
+        file.clear();
+        file.seekg(prev_pos);
+        return false;
+    }
+
+    return true;
+}
+
+void SaveFile::write_chunk(const Chunk &chunk) {
+    auto prev_pos = file.tellp();
+    try {
+        std::streampos chunk_stream_pos = 0;
+        auto loc = chunk_locations.find(chunk.chunk_pos);
+        if (loc != chunk_locations.end()) {
+            chunk_stream_pos = loc->second;
+        } else {
+            file.seekg(last_table);
+            size_t i = 0;
+            for (; i < 16; ++i) {
+                glm::ivec2 location = {
+                    read_binary<int32_t>(file),
+                    read_binary<int32_t>(file)
+                };
+                if (location.x == INT_MIN && location.y == INT_MIN) {
+                    file.seekp(last_table + std::streamoff(i * sizeof(int32_t) * 2));
+                    write_binary<int32_t>(file, chunk.chunk_pos.x);
+                    write_binary<int32_t>(file, chunk.chunk_pos.y);
+                    chunk_stream_pos = last_table + std::streamoff(TABLE_SIZE + CHUNK_SIZE * i);
+                    break;
+                }
+            }
+            if (i == 16) {
+                file.seekp(last_table + std::streamoff(TABLE_SIZE + CHUNK_SIZE * 16));
+                last_table = file.tellp();
+                chunk_stream_pos = last_table + std::streamoff(TABLE_SIZE);
+                write_binary<int32_t>(file, chunk.chunk_pos.x);
+                write_binary<int32_t>(file, chunk.chunk_pos.y);
+                for (size_t i = 1; i < 16; ++i) {
+                    write_binary<int32_t>(file, INT_MIN);
+                    write_binary<int32_t>(file, INT_MIN);
+                }
+                for (size_t i = 0; i < CHUNK_SIZE * 16; ++i) {
+                    write_binary<uint8_t>(file, 0);
+                }
+            }
+            chunk_locations[chunk.chunk_pos] = chunk_stream_pos;
+        }
+
+        file.seekp(chunk_stream_pos);
+
+
+        for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
+            uint8_t block = static_cast<uint8_t>(static_cast<uint32_t>(chunk.GetBlock(pos)));
+            write_binary<uint8_t>(file, block);
+        }
+    } catch (std::ios_base::failure &error) {
+        file.clear();
+        file.seekp(prev_pos);
+        assert(false);
+    }
+    file.flush();
+}
+
+SaveFile::~SaveFile() {
+    file.flush();
+    file.close();
+}
 
 glm::vec3 PhysicalWorld::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const {
     glm::vec3 new_pos = pos;
@@ -178,26 +352,6 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
         }
     };
 
-/*
-
-            BoundingBox old_box = { pos, size };
-
-            new_vel = vel + acc * (dt / iterations);
-            new_pos = pos + (vel + movement) * (dt / iterations);
-
-            vec3 components[3] = { vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1) };
-            for (size_t a = 0; a < 3; ++a) {
-                BoundingBox b = {
-                    pos + components[a] * (vel + movement) * (dt / iterations),
-                    size
-                };
-                if (!rect_intersects(phys, entities, i, b)) {
-                    pos = pos + components[a] * (vel + movement) * (dt / iterations);
-                } else {
-                    vel = vel * (1.f - components[a]);
-                }
-            }
-*/
     if (space_pressed && entities[0].rigidbody.on_ground) {
         entities[0].rigidbody.apply_impulse(vec3(0, Player::jump_speed, 0));
     }
@@ -207,29 +361,6 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
     player.set_position(entities[0].transform.pos);
     player.velocity = entities[0].rigidbody.vel;
     player.on_ground = entities[0].rigidbody.on_ground;
-    
-
-    
-    /*
-    const float speed = 100.f * delta_time_s;
-    const auto keypresses = SDL_GetKeyboardState(NULL);
-
-    if (!inventory.is_open()) {
-        const auto keypresses = SDL_GetKeyboardState(NULL);
-        if (keypresses[SDL_SCANCODE_A]) {
-            player.move_right(-speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_D]) {
-            player.move_right(speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_S]) {
-            player.move_forward(-speed, *this);
-        }
-        if (keypresses[SDL_SCANCODE_W]) {
-            player.move_forward(speed, *this);
-        }
-    }
-    player.apply_gravity(*this, delta_time_s);
 
     const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
     if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
@@ -244,20 +375,20 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
                 
                 SetBlock(*selected_block, BlockType::Air);
             
-                 TODO: FIXME When blocks change request a change in the renderer somehow
+                /* TODO: FIXME When blocks change request a change in the renderer somehow
                 auto loc = meshes.find(new_block->chunk_pos);
                 if (loc != meshes.end()) {
                     loc->second = MeshBuffer(BlockMesh::Generate(chunks[new_block->chunk_pos]));
                 }
                 
-                
+                */
             }
         } else {
             this->selected_block = new_block;
             selected_block_damage = BLOCK_DURABILITY;
         }
     }
-    */
+
 }
 
 PhysicalWorld::PhysicalWorld() {
@@ -401,7 +532,7 @@ void PhysicalWorld::save(const std::string &path) const {
 
                 file.flush();
 
-                for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos) ;Chunk::loop_through(pos)) {
+                for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
                     write_binary<uint32_t>(file, static_cast<uint32_t>(chunk.GetBlock(pos)));
                 }
 

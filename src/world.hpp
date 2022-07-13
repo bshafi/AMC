@@ -1,6 +1,9 @@
 #pragma once
 
 #include <memory>
+#include <thread>
+#include <mutex>
+#include <fstream>
 
 #include "standard.hpp"
 #include "camera.hpp"
@@ -10,6 +13,37 @@
 #include "mesh.hpp"
 
 class Renderer;
+
+class SaveFile {
+public:
+    SaveFile(const std::string &s);
+    // returns false if chunk was not found
+    bool read_chunk(const glm::ivec2 &pos, Chunk &chunk);
+
+    void write_chunk(const Chunk &chunk);
+
+    ~SaveFile();
+    
+    static constexpr uint32_t CHUNK_SIZE = Chunk::BLOCKS_IN_CHUNK * sizeof(uint8_t);
+    static constexpr uint32_t TABLE_SIZE = 16 * sizeof(int32_t) * 2;
+private:
+
+    void initialize_new_file();
+
+    void pad16();
+    void skip16();
+    void skip_chunk();
+
+    bool read_header();
+    void write_header();
+
+    bool read_table();
+
+
+    std::fstream file;
+    std::unordered_map<glm::ivec2, std::streampos> chunk_locations;
+    std::streampos last_table;
+};
 
 struct PhysicalWorld {
     std::unordered_map<glm::ivec2, Chunk> chunks;
