@@ -4,6 +4,7 @@
 #include <thread>
 #include <mutex>
 #include <fstream>
+#include <queue>
 
 #include "standard.hpp"
 #include "camera.hpp"
@@ -45,8 +46,38 @@ private:
     std::streampos last_table;
 };
 
+using ChunkPtr = std::unique_ptr<Chunk>;
+
+class ChunkLoader {
+public:
+    ChunkLoader(const std::string &s);
+
+    void load_chunks(glm::ivec2);
+    void unload_chunks(ChunkPtr &&);
+
+    ChunkPtr retrieve_chunk();
+
+    int num_chunks_to_retrieve();
+private:
+    static void chunk_thread_fn(std::string);
+    static void initialize_chunk_thread(const std::string&);
+    static std::once_flag intialize_thread;
+    static std::thread chunk_thread;
+
+    static std::mutex chunks_to_load_lock;
+    static std::queue<glm::ivec2> chunks_to_load;
+    
+    static std::mutex chunks_to_unload_lock;
+    static std::queue<ChunkPtr> chunks_to_unload;
+
+    static std::mutex chunks_to_retrieve_lock;
+    static std::queue<ChunkPtr> chunks_to_retrieve;
+    static std::atomic_int len_chunks_to_retrieve;
+};
+
 struct PhysicalWorld {
-    std::unordered_map<glm::ivec2, Chunk> chunks;
+    ChunkLoader loader;
+    std::unordered_map<glm::ivec2, ChunkPtr> chunks;
     Player player;
     std::optional<BlockHit> selected_block;
     int32_t selected_block_damage;
@@ -62,6 +93,7 @@ struct PhysicalWorld {
     static const uint32_t DEFAULT_SEED = 0x33333333;
 
     std::string save_name;
+    //SaveFile save_file;
 
     glm::vec3 try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const;
     bool intersects_block(const glm::vec3 &pos, const AABB &aabb) const;
@@ -69,9 +101,8 @@ struct PhysicalWorld {
     BlockType GetBlock(const BlockHit &block_hit);
     void SetBlock(const BlockHit &block_hit, BlockType type);
 
-    void generate(uint32_t seed = DEFAULT_SEED) noexcept;
+    static void generate_chunk(glm::ivec2 p, Chunk &,uint32_t seed = DEFAULT_SEED);
     void load(const std::string &path);
-    void save(const std::string &path) const;
 
     void handle_events(const std::vector<SDL_Event> &events, float delta_ticks_s);
 
