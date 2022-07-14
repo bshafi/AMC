@@ -14,8 +14,11 @@
 #include "imgui_impl_sdl.h"
 
 
-SaveFile::SaveFile(const std::string &s)
-    : file(s, std::ios_base::in | std::ios_base::out | std::ios_base::binary) {
+SaveFile::SaveFile(const std::string &s) {
+    if (!std::filesystem::exists(s)) {
+        std::ofstream temp(s);
+    }
+    file.open(s, std::ios_base::in | std::ios_base::out | std::ios_base::binary)
     assert(file.good());
     file.exceptions(~std::ios_base::goodbit);
 
