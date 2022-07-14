@@ -18,9 +18,8 @@ SaveFile::SaveFile(const std::string &s) {
     if (!std::filesystem::exists(s)) {
         std::ofstream temp(s);
     }
-    file.open(s, std::ios_base::in | std::ios_base::out | std::ios_base::binary)
+    file.open(s, std::ios_base::in | std::ios_base::out | std::ios_base::binary);
 
-    assert(file.good());
     file.exceptions(~std::ios_base::goodbit);
 
     if (file.seekg(0, std::ios_base::end).tellg() == 0) {
