@@ -8,17 +8,18 @@
 #include "world.hpp"
 #include "chunk.hpp"
 #include "entity.hpp"
+#include "atomic_ring_buffer.hpp"
 
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
-
 
 SaveFile::SaveFile(const std::string &s) {
     if (!std::filesystem::exists(s)) {
         std::ofstream temp(s);
     }
     file.open(s, std::ios_base::in | std::ios_base::out | std::ios_base::binary)
+
     assert(file.good());
     file.exceptions(~std::ios_base::goodbit);
 
@@ -192,6 +193,81 @@ SaveFile::~SaveFile() {
     file.close();
 }
 
+ChunkLoader::ChunkLoader(const std::string &s) {
+    std::call_once(intialize_thread, initialize_chunk_thread, std::ref(s));
+}
+void ChunkLoader::initialize_chunk_thread(const std::string &s) {
+    ChunkLoader::chunk_thread = std::thread(chunk_thread_fn, s);
+    ChunkLoader::chunk_thread.detach();
+}
+void ChunkLoader::load_chunks(glm::ivec2 p) {
+    std::scoped_lock l(chunks_to_load_lock);
+    chunks_to_load.push(p);
+}
+void ChunkLoader::unload_chunks(ChunkPtr &&chunk) {
+    std::scoped_lock l(chunks_to_unload_lock);
+    chunks_to_unload.emplace(std::move(chunk));
+}
+
+ChunkPtr ChunkLoader::retrieve_chunk() {
+    ChunkPtr chunk;
+    if (chunks_to_retrieve_lock.try_lock()) {
+        if (chunks_to_retrieve.size() > 0) {
+            chunk = std::move(chunks_to_retrieve.front());
+            chunks_to_retrieve.pop();
+        }
+        chunks_to_load_lock.unlock();
+    }
+    return chunk;
+}
+int ChunkLoader::num_chunks_to_retrieve() {
+    return len_chunks_to_retrieve.load(std::memory_order::memory_order_relaxed);
+}
+
+void ChunkLoader::chunk_thread_fn(std::string s) {
+    SaveFile save_file(s);
+    std::vector<glm::ivec2> r;
+
+    while (true) {
+        {
+            {
+                std::scoped_lock l(ChunkLoader::chunks_to_load_lock);
+                while (ChunkLoader::chunks_to_load.size() > 0) {
+                    auto p = chunks_to_load.front();
+                    r.push_back(p);
+                    chunks_to_load.pop();
+                }
+            }
+            if (r.size() > 0) {
+                auto p = r.back();
+                r.pop_back();
+                ChunkPtr chunk = std::make_unique<Chunk>();
+                if (!save_file.read_chunk(p, *chunk)) {
+                    PhysicalWorld::generate_chunk(p, *chunk);
+                }
+
+                std::scoped_lock l(ChunkLoader::chunks_to_retrieve_lock);
+                chunks_to_retrieve.emplace(std::move(chunk));
+                len_chunks_to_retrieve.fetch_add(1, std::memory_order::memory_order_relaxed);
+            }
+        }
+
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(1000ms);
+    }
+}
+std::once_flag ChunkLoader::intialize_thread;
+std::thread ChunkLoader::chunk_thread = std::thread();
+std::mutex ChunkLoader::chunks_to_load_lock;
+std::queue<glm::ivec2>ChunkLoader::chunks_to_load = {};
+
+std::mutex ChunkLoader::chunks_to_unload_lock;
+std::queue<ChunkPtr> ChunkLoader::chunks_to_unload = {};
+
+std::mutex ChunkLoader::chunks_to_retrieve_lock;
+std::queue<ChunkPtr> ChunkLoader::chunks_to_retrieve = {};
+std::atomic_int ChunkLoader::len_chunks_to_retrieve = { 0 };
+
 glm::vec3 PhysicalWorld::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const {
     glm::vec3 new_pos = pos;
     glm::vec3 components[] = { glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1) };
@@ -204,7 +280,7 @@ glm::vec3 PhysicalWorld::try_move_to(const glm::vec3 &pos, const glm::vec3 &delt
 }
 bool PhysicalWorld::intersects_block(const glm::vec3 &pos, const AABB &aabb) const {
     for (const auto &[chunk_pos, chunk] : this->chunks) {
-        if (chunk.intersects(pos, aabb)) {
+        if (chunk->intersects(pos, aabb)) {
             return true;
         }
     }
@@ -257,13 +333,13 @@ std::optional<BlockHit> PhysicalWorld::GetBlockFromRay(const Ray &ray) {
     std::optional<BlockHit> block = std::nullopt;
     glm::ivec3 location;
     for (auto &[chunk_pos, chunk] : chunks) {
-        std::optional<float> hit = ray.cast(chunk, 100.0f);
+        std::optional<float> hit = ray.cast(*chunk, 100.0f);
         if (!hit.has_value()) {
             continue;
         }
         glm::vec3 hit_pos = (*hit) * ray.direction + ray.endpoint;
-        location = get_hit_block(chunk, ray.direction, hit_pos);
-        assert(chunk_contains(chunk, location));
+        location = get_hit_block(*chunk, ray.direction, hit_pos);
+        assert(chunk_contains(*chunk, location));
         if ((*hit) < min_t) {
             min_t = *hit;
             block = BlockHit{ chunk_pos, location, get_hit_face(hit_pos, location) };
@@ -272,14 +348,22 @@ std::optional<BlockHit> PhysicalWorld::GetBlockFromRay(const Ray &ray) {
     return block;
 }
 BlockType PhysicalWorld::GetBlock(const BlockHit &block_handle) {
-    return chunks[block_handle.chunk_pos].GetBlock(block_handle.block_pos);
+    return chunks[block_handle.chunk_pos]->GetBlock(block_handle.block_pos);
 }
 void PhysicalWorld::SetBlock(const BlockHit &block_handle, BlockType type) {
-    chunks[block_handle.chunk_pos].GetBlock(block_handle.block_pos) = type;
+    chunks[block_handle.chunk_pos]->GetBlock(block_handle.block_pos) = type;
 }
 
 
 void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float delta_time_s) {
+    if (loader.num_chunks_to_retrieve() > 0) {
+        ChunkPtr chunk = loader.retrieve_chunk();
+        if (chunk != nullptr) {
+            
+            chunks.emplace(std::make_pair<glm::ivec2, ChunkPtr>(glm::ivec2(chunk->chunk_pos), std::move(chunk)));
+        }
+    }
+
     bool space_pressed = false;
     for (const auto &event : events) {
         if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_E) {
@@ -394,163 +478,82 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
 
 }
 
-PhysicalWorld::PhysicalWorld() {
+PhysicalWorld::PhysicalWorld() 
+    : loader("saves/save0.hex") {
     selected_block_damage = BLOCK_DURABILITY;
+
+    for (int i = 0; i < 5; ++i)
+        for (int j = 0; j < 5; ++j) {
+            loader.load_chunks(glm::ivec2(i, j));
+        }
 }
 PhysicalWorld::~PhysicalWorld() {
-    this->save(save_name);
+    /*
+    for (const auto &[pos, chunk] : chunks) {
+        save_file.write_chunk(*chunk);
+    }
+    */
 }
 
 
-void PhysicalWorld::generate(uint32_t seed) noexcept {
-    this->chunks.clear();
-
+void PhysicalWorld::generate_chunk(glm::ivec2 p, Chunk &chunk, uint32_t seed) {
+    chunk.chunk_pos = p;
     siv::PerlinNoise noise(seed);
     
+    p.x %= 5;
+    if (p.x < 0) {
+        p.x = 5 - p.x;
+    }
+    int i = p.x;
+    p.y %= 5;
+    if (p.y < 0) {
+        p.y = 5 - p.y;
+    }
+    int j = p.y;
+    
+
+    const int32_t octaves = 4;
+    const float frequency = 1.f;
     const double fx = (Chunk::CHUNK_WIDTH * 5) / frequency;
     const double fy = (Chunk::CHUNK_WIDTH * 5) / frequency;
 
-    for (uint32_t i = 0; i < 5; ++i)
-        for (uint32_t j = 0; j < 5; ++j) {
-        Chunk chunk;
+    for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
+        BlockType block_id = BlockType::Air;
+        assert(0 <= pos.x && pos.x < Chunk::CHUNK_WIDTH);
+        assert(0 <= pos.z && pos.z < Chunk::CHUNK_WIDTH);
 
-        for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-            BlockType block_id = BlockType::Air;
-            assert(0 <= pos.x && pos.x < Chunk::CHUNK_WIDTH);
-            assert(0 <= pos.z && pos.z < Chunk::CHUNK_WIDTH);
-
-            double r_noise = noise.accumulatedOctaveNoise2D_0_1((pos.x + (i * Chunk::CHUNK_WIDTH))  / fx, (pos.z + (j * Chunk::CHUNK_WIDTH)) / fy, octaves);
-            const uint8_t height = static_cast<uint8_t>(std::clamp(r_noise * 128, 0.0, 255.0));
-            if (pos.y <= height) {
-                if (pos.y == height) {
-                    block_id = (BlockType::Grass);
-                } else if (pos.y + 4 > height) {
-                    block_id = (BlockType::Dirt);
-                } else {
-                    block_id = (BlockType::Stone);
-                }
+        double r_noise = noise.accumulatedOctaveNoise2D_0_1((pos.x + (i * Chunk::CHUNK_WIDTH))  / fx, (pos.z + (j * Chunk::CHUNK_WIDTH)) / fy, octaves);
+        const uint8_t height = static_cast<uint8_t>(std::clamp(r_noise * 128, 0.0, 255.0));
+        if (pos.y <= height) {
+            if (pos.y == height) {
+                block_id = (BlockType::Grass);
+            } else if (pos.y + 4 > height) {
+                block_id = (BlockType::Dirt);
+            } else {
+                block_id = (BlockType::Stone);
             }
-            chunk.GetBlock(pos) = block_id;
         }
-        chunk.chunk_pos = glm::ivec2(i, j);
-        chunks.emplace(std::make_pair<glm::ivec2, Chunk>(glm::ivec2(chunk.chunk_pos), std::move(chunk)));
+        chunk.GetBlock(pos) = block_id;
     }
 }
-
 
 
 void PhysicalWorld::load(const std::string &path) {
     this->chunks.clear();
     this->save_name = path;
-
-    try {
-        std::ifstream file(path, std::ios_base::binary);
-        file.exceptions(~std::ios_base::goodbit);
-
-        const auto pad16 = [&file]() {
-            while (file.tellg() % 16 != 0) {
-                read_binary<uint8_t>(file);
+    //save_file = SaveFile(path);
+    /*
+    for (size_t i = 0; i < 5; ++i)
+        for (size_t j = 0; j < 5; ++j) {
+            std::unique_ptr<Chunk> chunk = std::make_unique<Chunk>();
+            if (!save_file.read_chunk(glm::ivec2(i, j), *chunk)) {
+                generate_chunk(glm::ivec2(i, j), *chunk);
             }
-        };
 
-        const uint32_t version = read_binary<uint32_t>(file);
-        assert(version == PhysicalWorld::WORLD_VERSION);
-        const uint32_t chunks_count = read_binary<uint32_t>(file);
-
-        //this->chunks.reserve(chunks_count);
-        std::vector<uint32_t> chunk_positions;
-        chunk_positions.reserve(chunks_count);
-
-        for (uint32_t i = 0; i < chunks_count; ++i) {
-            chunk_positions.push_back(read_binary<uint32_t>(file));
+            chunks.emplace(std::make_pair<glm::ivec2, ChunkPtr>(glm::ivec2(i, j), std::move(chunk)));
         }
-
-        pad16();
-
-        for (uint32_t i = 0; i < chunks_count; ++i) {
-            Chunk chunk;
-            file.seekg(chunk_positions[i], std::ios_base::beg);
-
-            const int32_t chunk_pos_x = read_binary<int32_t>(file);
-            const int32_t chunk_pos_y = read_binary<int32_t>(file);
-            chunk.chunk_pos = glm::ivec2(chunk_pos_x, chunk_pos_y);
-
-            const uint64_t blocks_in_chunk = read_binary<uint64_t>(file);
-            assert(blocks_in_chunk == Chunk::BLOCKS_IN_CHUNK);
-
-            pad16();
-            for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-                chunk.GetBlock(pos) = static_cast<BlockType>(read_binary<uint32_t>(file));
-            }
-            pad16();
-            chunks.emplace(std::make_pair<glm::ivec2, Chunk>(glm::ivec2(chunk.chunk_pos), std::move(chunk)));
-        }
-
-        file.close();
-    } catch(std::ios_base::failure &error) {
-        std::cout << "File could not open: " << error.what() << std::endl;
-        std::cout << "Generating new world instead" << std::endl;
-
-        return PhysicalWorld::generate();
-    }
+    */
 }
-void PhysicalWorld::save(const std::string &path) const {
-    try {
-        std::ofstream file(path, std::ios_base::binary);
-        file.exceptions(~std::ios_base::goodbit);
-
-        const auto pad16 = [&file]() {
-            while (file.tellp() % 16 != 0) {
-                write_binary<uint8_t>(file, static_cast<uint8_t>(0));
-            }
-        };
-
-        assert(chunks.size() > 0);
-
-        write_binary<uint32_t>(file, WORLD_VERSION);
-        write_binary<uint32_t>(file, this->chunks.size());
-
-        const uint32_t chunk_pos_start = file.tellp();
-
-        for (uint32_t i = 0; i < this->chunks.size(); ++i) {
-            write_binary<uint32_t>(file, 0xffffffff);
-        }
-
-        pad16();
-        {
-            uint32_t i = 0;
-            for (const auto &[chunk_pos, chunk] : chunks) {
-                const uint32_t curr_chunk_pos = file.tellp();
-                file.seekp(chunk_pos_start + i * sizeof(uint32_t), std::ios_base::beg);
-                write_binary<uint32_t>(file, curr_chunk_pos);
-                file.seekp(curr_chunk_pos, std::ios_base::beg);
-
-                write_binary<int32_t>(file, chunk.chunk_pos.x);
-                write_binary<int32_t>(file, chunk.chunk_pos.y);
-                write_binary<uint64_t>(file, Chunk::BLOCKS_IN_CHUNK);
-
-                file.flush();
-
-                pad16();
-
-                file.flush();
-
-                for (auto pos = glm::ivec3(); Chunk::is_within_chunk_bounds(pos); Chunk::loop_through(pos)) {
-                    write_binary<uint32_t>(file, static_cast<uint32_t>(chunk.GetBlock(pos)));
-                }
-
-                pad16();
-                ++i;
-            }
-        }
-
-        file.close();
-
-    } catch (std::ios_base::failure &error) {
-        std::cout << "File could not be written to: " << error.what() << std::endl;
-    }
-}
-
 void RenderWorld::handle_events(const std::vector<SDL_Event> &events) {
     for (const auto &event : events) { 
         if (event.type == SDL_WINDOWEVENT_RESIZED) {
@@ -566,7 +569,7 @@ void RenderWorld::handle_events(const std::vector<SDL_Event> &events) {
 void RenderWorld::draw(PhysicalWorld &phys) {
     for (const auto &[key, chunk] : phys.chunks) {
         if (meshes.find(key) == meshes.end()) {
-            meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk.chunk_pos), (MeshBuffer(BlockMesh::Generate(chunk)))));
+            meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk->chunk_pos), (MeshBuffer(BlockMesh::Generate(*chunk)))));
         }
     }
 
@@ -618,7 +621,7 @@ void RenderWorld::draw(PhysicalWorld &phys) {
     ImGui::DragFloat("frequency", &phys.frequency, 1.0f, 10.0f);
     ImGui::DragInt("octaves", &phys.octaves, 0, 20);
     if (ImGui::Button("regenerate")) {
-        phys.generate();
+        //phys.generate();
     }
     if (ImGui::Button("toggle debug mode")) {
         phys.player.debug_mode = !phys.player.debug_mode;
