@@ -19,7 +19,7 @@
 void gen_main_gui(GUI &);
 
 int main() {
-    SDL_Window *window = Init_SDL_and_GL();
+    SDL_Window *window = Init_SDL_and_GL("Another Minecraft Clone", 1280, 720);
 
     assert(window);
 

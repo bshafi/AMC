@@ -25,7 +25,7 @@ struct FilterData {
     SDL_GLContext context;
 } filter_data;
 
-SDL_Window *Init_SDL_and_GL() {
+SDL_Window* Init_SDL_and_GL(const char *title, uint32_t width, uint32_t height) {
     SDL_SetMainReady();
     assert(SDL_Init(DEFAULT_SDL_INIT_FLAGS) == 0);
     assert(IMG_Init(DEFAULT_IMG_INIT_FLAGS) == DEFAULT_IMG_INIT_FLAGS);
@@ -47,11 +47,11 @@ SDL_Window *Init_SDL_and_GL() {
 
 
     SDL_Window *window = SDL_CreateWindow(
-        "Another Minecraft Clone", 
+        title, 
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 
-        INITIAL_WINDOW_WIDTH,
-        INITIAL_WINDOW_HEIGHT, 
+        width,
+        height, 
         DEFAULT_SDL_WINDOW_FLAGS
     );
 

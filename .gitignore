@@ -56,3 +56,4 @@ build/**
 showimage
 showanim
 tests/test_save_file.hex
+animation_editor
