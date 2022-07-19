@@ -8,6 +8,7 @@
 
 
 #if SDL_BYTEORDER == SDL_LIL_ENDIAN
+
     template <>
     uint8_t local_endian_to_big_endian(uint8_t value) {
         return value;
@@ -47,6 +48,30 @@
     int32_t big_endian_to_local_endian(int32_t value) {
         return static_cast<int32_t>(big_endian_to_local_endian<uint32_t>(static_cast<uint32_t>(value)));
     }
+
+    template <>
+    float local_endian_to_big_endian(float value) {
+        uint32_t h_value;
+        static_assert(sizeof(value) == sizeof(h_value));
+        memcpy(&h_value, &value, sizeof(value));
+
+        h_value = local_endian_to_big_endian<uint32_t>(h_value);
+        memcpy(&value, &h_value, sizeof(value));
+
+        return value;
+    }
+
+    template <>
+    float big_endian_to_local_endian(float value) {
+        uint32_t h_value;
+        static_assert(sizeof(value) == sizeof(h_value));
+        memcpy(&h_value, &value, sizeof(value));
+
+        h_value = big_endian_to_local_endian<uint32_t>(h_value);
+        memcpy(&value, &h_value, sizeof(value));
+
+        return value;
+    }
 #elif SDL_BYTEORDER == SDL_BIG_ENDIAN
     // If the native endian is already big_endian no conversions need to be done and only the type needs to be returned
     #define JUST_RETURN_VALUE(type) \
@@ -67,6 +92,7 @@
     JUST_RETURN_VALUE(int8_t)
     JUST_RETURN_VALUE(int32_t)
     JUST_RETURN_VALUE(int64_t)
+    JUST_RETURN_VALUE(float)
 
     #undef JUST_RETURN_VALUE
 #else
