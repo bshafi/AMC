@@ -80,11 +80,7 @@ SDL_Window* Init_SDL_and_GL(const char *title, uint32_t width, uint32_t height) 
     SDL_SetEventFilter(
         [](void *userdata, SDL_Event *event){
             FilterData *filter_data = static_cast<FilterData*>(userdata);
-            filter_data->filter_mutex.lock();
-
             *event = filter_events(filter_data->fake_window_bounds, filter_data->true_window_bounds, *event);
-
-            filter_data->filter_mutex.unlock();
             return 1;
         },
         &filter_data
@@ -322,9 +318,7 @@ bool glBreakOnError() {
     return true;
 }
 glm::uvec2 GetTrueWindowSize() {
-    filter_data.filter_mutex.lock();
     auto window_size = filter_data.true_window_bounds;
-    filter_data.filter_mutex.unlock();
 
     return window_size;
 }
