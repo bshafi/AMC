@@ -11,7 +11,7 @@
 constexpr int INITIAL_WINDOW_WIDTH = 853;
 constexpr int INITIAL_WINDOW_HEIGHT = 480;
 constexpr uint32_t DEFAULT_SDL_WINDOW_FLAGS = SDL_WINDOW_RESIZABLE | SDL_WINDOW_SHOWN | SDL_WINDOW_OPENGL;
-constexpr uint32_t FPS = 100;
+constexpr uint32_t FPS = 60;
 
 SDL_Window* Init_SDL_and_GL(const char *title, uint32_t width, uint32_t height);
 void Quit_SDL_and_GL();
