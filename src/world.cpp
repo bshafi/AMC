@@ -360,16 +360,16 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
     const float speed = 1000.f * delta_time_s;
     vec3 movement = { 0, 0, 0 };
     if (keypresses[SDL_SCANCODE_A]) {
-        movement = movement - player.camera.right();
+        movement = movement - main_camera.right();
     }
     if (keypresses[SDL_SCANCODE_D]) {
-        movement = movement + player.camera.right();
+        movement = movement + main_camera.right();
     }
     if (keypresses[SDL_SCANCODE_S]) {
-        movement = movement - player.camera.forward();
+        movement = movement - main_camera.forward();
     }
     if (keypresses[SDL_SCANCODE_W]) {
-        movement = movement + player.camera.forward();
+        movement = movement + main_camera.forward();
     }
     if (!player.debug_mode) {
         movement = movement * vec3(1, 0, 1);
@@ -400,13 +400,13 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
 
     update_entities(*this, entities, delta_time_s);
 
-    player.set_position(entities[0].transform.pos);
+    player.set_position(entities[0].transform.pos, *this);
     player.velocity = entities[0].rigidbody.vel;
     player.on_ground = entities[0].rigidbody.on_ground;
 
     const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
     if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-        auto new_block = GetBlockFromRay(Ray{ player.camera.pos(), player.camera.forward() });
+        auto new_block = GetBlockFromRay(Ray{ main_camera.pos(), main_camera.forward() });
         if (selected_block != std::nullopt &&
             new_block->chunk_pos == selected_block->chunk_pos &&
             new_block->block_pos == selected_block->block_pos
@@ -648,7 +648,7 @@ void RenderWorld::draw(PhysicalWorld &phys) {
     ASSERT_ON_GL_ERROR();
      
     glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glm::mat4 view = phys.player.camera.view_matrix();
+    glm::mat4 view = phys.main_camera.view_matrix();
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
     
@@ -736,9 +736,11 @@ RenderWorld::RenderWorld(PhysicalWorld &phys) :
     glGenBuffers(1, &globals_3d_ubo);
     glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
     glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
-    glm::mat4 view = phys.player.camera.view_matrix();
+    glm::mat4 view = phys.main_camera.view_matrix();
+
+    glm::uvec2 win_size = GetTrueWindowSize();
     glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f);
+    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(win_size.x) / static_cast<float>(win_size.y), 0.1f, 100.f);
     glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
 
     this->shader.bind_UBO("globals_3d", 0);

@@ -88,6 +88,8 @@ struct PhysicalWorld {
 
     Inventory inventory;
 
+    Camera main_camera;
+
     float frequency = 1.f;
     int32_t octaves = 4;
 

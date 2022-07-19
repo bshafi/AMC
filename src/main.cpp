@@ -31,7 +31,7 @@ int main() {
 
     PhysicalWorld phys;
     phys.load("saves/save0.hex");
-    phys.player.set_position(glm::vec3(0, 66, 0));
+    phys.player.set_position(glm::vec3(0, 66, 0), phys);
     RenderWorld rend(phys);
 
     ASSERT_ON_GL_ERROR();
@@ -112,11 +112,11 @@ int main() {
             }
             float position[3] = { phys.player.position.x, phys.player.position.y, phys.player.position.z };
             ImGui::InputFloat3("position", position);
-            float rotation[3] = { phys.player.camera.pitch(), phys.player.camera.yaw(), 0 };
+            float rotation[3] = { phys.main_camera.pitch(), phys.main_camera.yaw(), 0 };
             ImGui::InputFloat3("rotation", rotation);
             ImGui::DragFloat("gravity", &phys.player.gravity, 0.1f, 1.0f, 8.0f);
             if (ImGui::Button("cast ray")) {
-                std::optional<BlockHit> block_type = phys.GetBlockFromRay(Ray{ phys.player.camera.pos(), phys.player.camera.forward() });
+                std::optional<BlockHit> block_type = phys.GetBlockFromRay(Ray{ phys.main_camera.pos(), phys.main_camera.forward() });
                 std::cout << "Block Hit ";
                 if (block_type != std::nullopt) {
                     std::cout << static_cast<uint32_t>(phys.GetBlock(*block_type)) << std::endl;
