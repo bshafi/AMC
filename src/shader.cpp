@@ -67,6 +67,7 @@ void Shader::bind_texture_to_sampler_2D(const std::vector<std::pair<std::string,
 }
 
 void Shader::bind_UBO(const std::string &ubo_name, unsigned int loc) {
+    ASSERT_ON_GL_ERROR();
     auto index = glGetUniformBlockIndex(this->shader_program, ubo_name.c_str());
     glUniformBlockBinding(this->shader_program, index, loc);
 

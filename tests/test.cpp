@@ -1,7 +1,7 @@
 #include "test_raycast.hpp"
 #include "test_intersection.hpp"
 #include "test_save_file.hpp"
-#include "test_atomic_ring_buffer.hpp"
+#include "test_mcmodel.hpp"
 
 #include "gtest/gtest.h"
 
