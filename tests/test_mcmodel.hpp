@@ -5,13 +5,13 @@
 #include "gtest/gtest.h"
 
 
-TEST(MCModel, Test0) {
+TEST(MCModelPart, Test0) {
     std::stringstream ss;
 
-    MCModel model(10, 0);
+    MCModelPart model(10, 0);
     model.serialize(ss);
 
-    auto bob = MCModel::deserialize(ss);
+    auto bob = MCModelPart::deserialize(ss);
     ASSERT_NE(bob, std::nullopt);
 
     ASSERT_EQ(bob->id, model.id);

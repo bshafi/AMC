@@ -27,7 +27,7 @@ int main() {
     ASSERT_ON_GL_ERROR();
 
     int model_id = NULL_ID;
-    std::unordered_map<uint32_t, MCModel> model_groups;
+    std::unordered_map<uint32_t, MCModelPart> model_groups;
 
     std::optional<std::string> path;
     std::optional<Texture> texture;
@@ -106,7 +106,7 @@ int main() {
                             std::ifstream fistream(results[0], std::ios_base::binary);
                             fistream.exceptions(~std::ios_base::goodbit);
                             while (true) {
-                                auto bob = MCModel::deserialize(fistream);
+                                auto bob = MCModelPart::deserialize(fistream);
                                 if (bob == std::nullopt) {
                                     break;
                                 }
@@ -151,7 +151,7 @@ int main() {
 
             if (ImGui::Button("Add Cube")) {
                 ++model_id;
-                model_groups.emplace(model_id, MCModel(model_id, 0));
+                model_groups.emplace(model_id, MCModelPart(model_id, 0));
             }
             static uint32_t selected_cube = NULL_ID;
 
@@ -160,7 +160,7 @@ int main() {
             }
             if (ImGui::Button("Duplicate") && model_groups.find(selected_cube) != model_groups.end()) {
                 ++model_id;
-                MCModel dup = model_groups[selected_cube];
+                MCModelPart dup = model_groups[selected_cube];
                 dup.id = model_id;
                 model_groups.emplace(dup.id, dup);
             }

@@ -1,3 +1,4 @@
+#include "gl_helper.hpp"
 #include "entity.hpp"
 #include "world.hpp"
 #include "standard.hpp"
@@ -92,4 +93,67 @@ void update_entities(PhysicalWorld &phys, std::vector<Entity> &entities, const f
         entity.rigidbody.vel = vel;
         entity.rigidbody.movement = { 0, 0 , 0 };
     }
+}
+
+PlayerController::PlayerController()
+    : up_pressed(false), left_pressed(false), down_pressed(false), right_pressed(false), debug_mode(true) {
+
+}
+void PlayerController::init(Entity &entity, PhysicalWorld &world) {
+    entity.transform.pos.y = 66.f;
+    entity.rigidbody.has_gravity = false;
+}
+void PlayerController::update(Entity &entity, PhysicalWorld &world, const std::vector<SDL_Event> &events, float dt) {
+    world.main_camera.pos(entity.transform.pos + vec3(0.f, 2.f, 0.f));
+
+    for (const auto &event : events) {
+        if (event.type == SDL_KEYDOWN || event.type == SDL_KEYUP) {
+            bool pressed = event.type == SDL_KEYDOWN;
+            switch (event.key.keysym.scancode) {
+            case SDL_SCANCODE_W:
+                up_pressed = pressed;
+                break;
+            case SDL_SCANCODE_A:
+                left_pressed = pressed;
+                break;
+            case SDL_SCANCODE_S:
+                down_pressed = pressed;
+                break;
+            case SDL_SCANCODE_D:
+                right_pressed = pressed;
+                break;
+            default:;
+            }
+        }
+        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+            entity.rigidbody.apply_impulse(vec3(0.f, 4.5f, 0.f));
+        }
+        if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
+            world.main_camera.rotate_right(0.25f * M_PI * event.motion.xrel * dt);
+            world.main_camera.rotate_upwards(-0.25f * M_PI * event.motion.yrel * dt);
+        }
+    }
+
+    glm::vec3 movement = { 0.f, 0.f, 0.f };
+    if (up_pressed) {
+        movement = movement + world.main_camera.forward();
+    }
+    if (down_pressed) {
+        movement = movement - world.main_camera.forward();
+    }
+    if (left_pressed) {
+        movement = movement - world.main_camera.right();
+    }
+    if (right_pressed) {
+        movement = movement + world.main_camera.right();
+    }
+    if (!debug_mode) {
+        movement = movement * vec3(1.f, 0.f, 1.f);
+    }
+    float mag = glm::length(movement);
+    if (mag >= 0.001f) {
+        movement /= mag;
+        movement = movement * 1000.f * dt;
+    }
+    entity.rigidbody.apply_movement(movement);
 }

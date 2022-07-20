@@ -335,74 +335,24 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
             if (event.type == SDL_MOUSEBUTTONDOWN && SDL_GetRelativeMouseMode() == SDL_FALSE && event.button.button == SDL_BUTTON_LEFT) {
                 SDL_SetRelativeMouseMode(SDL_TRUE);
             }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_F3) {
-                player.toggle_debug_mode();
-            }
             if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
 
             }
             if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
                 SDL_SetRelativeMouseMode(SDL_FALSE);
             }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
-                //player.jump(*this);
-                space_pressed = true;
-            }
-            if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
-                player.look_right(0.25f * M_PI * event.motion.xrel * delta_time_s, *this);
-                player.look_up(-0.25f * M_PI * event.motion.yrel * delta_time_s, *this);
-            }
         }
     }
 
-    
-    const auto keypresses = SDL_GetKeyboardState(NULL);
-    const float speed = 1000.f * delta_time_s;
-    vec3 movement = { 0, 0, 0 };
-    if (keypresses[SDL_SCANCODE_A]) {
-        movement = movement - main_camera.right();
-    }
-    if (keypresses[SDL_SCANCODE_D]) {
-        movement = movement + main_camera.right();
-    }
-    if (keypresses[SDL_SCANCODE_S]) {
-        movement = movement - main_camera.forward();
-    }
-    if (keypresses[SDL_SCANCODE_W]) {
-        movement = movement + main_camera.forward();
-    }
-    if (!player.debug_mode) {
-        movement = movement * vec3(1, 0, 1);
-    }
-    float mag = glm::length(movement);
-    if (mag >= 0.001f) {
-        movement = movement * speed;
-    }
-
-    std::vector<Entity> entities = {
-        {
-            {
-                player.position,
-                player.aabb
-            },
-            {
-                movement,
-                player.velocity,
-                !player.debug_mode,
-                player.on_ground
-            }
+    for (auto &entity : entities) {
+        if (entity.controller != nullptr) {
+            entity.controller->update(entity, *this, events, delta_time_s);
         }
-    };
-
-    if (space_pressed && entities[0].rigidbody.on_ground) {
-        entities[0].rigidbody.apply_impulse(vec3(0, Player::jump_speed, 0));
     }
 
     update_entities(*this, entities, delta_time_s);
 
-    player.set_position(entities[0].transform.pos, *this);
-    player.velocity = entities[0].rigidbody.vel;
-    player.on_ground = entities[0].rigidbody.on_ground;
+    /*
 
     const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
     if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
@@ -417,19 +367,23 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
                 
                 SetBlock(*selected_block, BlockType::Air);
             
-                /* TODO: FIXME When blocks change request a change in the renderer somehow
+                TODO: FIXME When blocks change request a change in the renderer somehow
                 auto loc = meshes.find(new_block->chunk_pos);
                 if (loc != meshes.end()) {
                     loc->second = MeshBuffer(BlockMesh::Generate(chunks[new_block->chunk_pos]));
                 }
                 
-                */
+            
             }
         } else {
             this->selected_block = new_block;
             selected_block_damage = BLOCK_DURABILITY;
         }
     }
+<<<<<<< HEAD
+=======
+    */
+>>>>>>> c5b485d (temp stash)
 }
 
 
@@ -540,6 +494,15 @@ PhysicalWorld::PhysicalWorld()
     : loader("saves/save0.hex") {
     selected_block_damage = BLOCK_DURABILITY;
 
+<<<<<<< HEAD
+=======
+    {
+        Entity main_player;
+        main_player.controller = std::make_unique<PlayerController>();
+        main_player.controller->init(main_player, *this);
+        entities.emplace_back(std::move(main_player));
+    }
+>>>>>>> c5b485d (temp stash)
 }
 PhysicalWorld::~PhysicalWorld() {
 }
@@ -667,8 +630,10 @@ void RenderWorld::draw(PhysicalWorld &phys) {
 
     float RENDER_DISTANCE = PhysicalWorld::RENDER_DISTANCE * Chunk::CHUNK_WIDTH;
 
+
+
     for (auto &[chunk_pos, mesh_buffer] : this->meshes) {
-        if (glm::length(glm::vec2(phys.player.position.x, phys.player.position.z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
+        if (glm::length(glm::vec2(phys.main_camera.pos().x, phys.main_camera.pos().z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
             continue;
         }
         shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
@@ -696,7 +661,7 @@ void RenderWorld::draw(PhysicalWorld &phys) {
         //phys.generate();
     }
     if (ImGui::Button("toggle debug mode")) {
-        phys.player.debug_mode = !phys.player.debug_mode;
+        //phys.player.debug_mode = !phys.player.debug_mode;
     }
     ImGui::DragFloat("gravity", &Player::gravity, 0.0f, 10.0f);
     ImGui::DragFloat("movement_speed", &Player::movement_speed, 0.0f, 10.0f);
