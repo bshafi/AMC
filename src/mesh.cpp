@@ -106,10 +106,6 @@ BlockMesh BlockMesh::Generate(const Chunk &chunk) {
     return mesh;
 }
 
-void MeshBuffer::rebuild(const BlockMesh &block_mesh) {
-
-}
-
 MeshBuffer::MeshBuffer(MeshBuffer &&rhs) noexcept
     : vbo(0), vao(0), size(0), capacity(0) {
     swap(*this, rhs);
@@ -153,15 +149,25 @@ uint32_t calc_verts(const Chunk &chunk) {
 
 MeshBuffer::MeshBuffer(const Chunk &chunk)
     :  MeshBuffer(calc_verts(chunk)) {
-    ASSERT_ON_GL_ERROR();
+    rebuild(chunk);
+}
+
+void MeshBuffer::rebuild(const Chunk &chunk) {
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    ASSERT_ON_GL_ERROR();
-    
+    {
+        auto verts = calc_verts(chunk);
+        if (verts > capacity) {
+            glBufferData(GL_ARRAY_BUFFER, verts * BlockVertex::gl_size, nullptr,  GL_DYNAMIC_DRAW);
+        }
+    }
+
     BlockMeshIterator bmi(chunk);
+
     uint8_t buffer[BlockVertex::gl_size * 256];
     uint32_t total_offset = 0;
     uint32_t offset = 0;
     uint32_t total_vertices = 0;
+
     while (bmi.next()) {
         for (uint32_t j = 0; j < 36; ++j) {
             auto vertex = bmi.vertices[j];
@@ -173,6 +179,7 @@ MeshBuffer::MeshBuffer(const Chunk &chunk)
             ++total_vertices;
 
             offset += BlockVertex::gl_size;
+
             if (offset + BlockVertex::gl_size >= sizeof(buffer)) {
                 glBufferSubData(GL_ARRAY_BUFFER, total_offset, offset, buffer);
                 ASSERT_ON_GL_ERROR();
@@ -191,8 +198,10 @@ MeshBuffer::MeshBuffer(const Chunk &chunk)
     ASSERT_ON_GL_ERROR();
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+    
     size = total_vertices;
 }
+
 MeshBuffer::MeshBuffer(uint32_t size) {
     ASSERT_ON_GL_ERROR();
 
@@ -220,7 +229,7 @@ MeshBuffer::MeshBuffer(uint32_t size) {
 
     ASSERT_ON_GL_ERROR();
 
-    size = 0;
+    this->size = 0;
     capacity = size;
 }
 MeshBuffer::~MeshBuffer() {

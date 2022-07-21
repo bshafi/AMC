@@ -24,7 +24,7 @@ public:
     MeshBuffer& operator=(MeshBuffer rhs) noexcept;
     friend void swap(MeshBuffer &lhs, MeshBuffer &rhs) noexcept;
 
-    void rebuild(const BlockMesh &block_mesh);
+    void rebuild(const Chunk &);
 
     void draw();
     MeshBuffer(const Chunk&);

@@ -118,6 +118,7 @@ struct PhysicalWorld {
 
 struct RenderWorld {
     std::unordered_map<glm::ivec2, MeshBuffer> meshes;
+    std::vector<MeshBuffer> empty_meshes;
     Texture orientation_texture;
 
     Texture blocks_texture;
@@ -125,6 +126,7 @@ struct RenderWorld {
     
     uint32_t globals_3d_ubo;
 
+    void update_chunks(PhysicalWorld &phys);
     void handle_events(const std::vector<SDL_Event> &events);
     void draw(PhysicalWorld &phys);
 

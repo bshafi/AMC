@@ -610,18 +610,41 @@ void RenderWorld::handle_events(const std::vector<SDL_Event> &events) {
             glViewport(0, 0, event.window.data1, event.window.data2);
             glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
             glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_DYNAMIC_DRAW);
-            glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(event.window.data1) / event.window.data2, 0.1f, 100.f);
+            auto win_size = GetTrueWindowSize();
+            glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(win_size.x) / win_size.y, 0.1f, 100.f);
             glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
         }
         ASSERT_ON_GL_ERROR();
     }
 }
-void RenderWorld::draw(PhysicalWorld &phys) {
-    for (const auto &[key, chunk] : phys.chunks) {
-        if (meshes.find(key) == meshes.end()) {
-            meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk->chunk_pos), (MeshBuffer(*chunk))));
+
+
+void RenderWorld::update_chunks(PhysicalWorld &phys) {
+    for (auto a = meshes.begin(); a != meshes.end(); ) {
+        if (phys.chunks.find(a->first) == phys.chunks.end()) {
+            empty_meshes.emplace_back(std::move(a->second));
+            a = meshes.erase(a);
+        } else {
+            ++a;
         }
     }
+    for (const auto &[key, chunk] : phys.chunks) {
+        if (meshes.find(key) == meshes.end()) {
+            if (!empty_meshes.empty()) {
+                MeshBuffer buffer = std::move(empty_meshes.back());
+                empty_meshes.pop_back();
+                buffer.rebuild(*chunk);
+                meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk->chunk_pos), std::move(buffer)));
+            } else {
+                MeshBuffer buffer(Chunk::BLOCKS_IN_CHUNK);
+                buffer.rebuild(*chunk);
+                meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk->chunk_pos), std::move(buffer)));
+            }
+        }
+    }
+}
+void RenderWorld::draw(PhysicalWorld &phys) {
+    update_chunks(phys);
 
     ASSERT_ON_GL_ERROR();
      
