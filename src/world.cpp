@@ -434,12 +434,6 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
     }
 }
 
-PhysicalWorld::PhysicalWorld() {
-    selected_block_damage = BLOCK_DURABILITY;
-}
-PhysicalWorld::~PhysicalWorld() {
-}
-
 
 void chunk_loader_loading_fn(std::string path) {
     std::vector<ChunkPtr> empty_chunks;
