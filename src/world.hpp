@@ -4,8 +4,6 @@
 #include <thread>
 #include <mutex>
 #include <fstream>
-#include <queue>
-#include <unordered_set>
 
 #include "standard.hpp"
 #include "camera.hpp"
@@ -47,39 +45,8 @@ private:
     std::streampos last_table;
 };
 
-using ChunkPtr = std::unique_ptr<Chunk>;
-
-void chunk_loader_loading_fn(std::string path);
-class ChunkLoader {
-public:
-    ChunkLoader(const std::string &path);
-
-    bool ready_to_retrieve() const;
-
-    bool request_chunk(glm::ivec2);
-    bool request_unload(ChunkPtr &&);
-    void notify_request();
-    ChunkPtr retrive_chunk();
-private:
-    friend void chunk_loader_loading_fn(std::string path);
-
-    static std::thread loading_thread;
-    static std::once_flag loading_fn_init_flag;
-
-    static std::mutex fullfilled_lock;
-    static std::condition_variable fullfilled_is_empty;
-    static std::vector<ChunkPtr> fullfilled_chunks;
-
-    static std::mutex request_lock;
-    static std::condition_variable has_made_request;
-    static std::queue<glm::ivec2> requested_chunks;
-    static std::queue<ChunkPtr> requested_unloads;
-};
-
 struct PhysicalWorld {
-    std::unordered_set<glm::ivec2> requested_chunks;
-    ChunkLoader loader;
-    std::unordered_map<glm::ivec2, ChunkPtr> chunks;
+    std::unordered_map<glm::ivec2, Chunk> chunks;
     Player player;
     std::optional<BlockHit> selected_block;
     int32_t selected_block_damage;
@@ -95,7 +62,6 @@ struct PhysicalWorld {
     static const uint32_t DEFAULT_SEED = 0x33333333;
 
     std::string save_name;
-    //SaveFile save_file;
 
     glm::vec3 try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const;
     bool intersects_block(const glm::vec3 &pos, const AABB &aabb) const;
@@ -103,11 +69,11 @@ struct PhysicalWorld {
     BlockType GetBlock(const BlockHit &block_hit);
     void SetBlock(const BlockHit &block_hit, BlockType type);
 
-    static void generate_chunk(glm::ivec2 p, Chunk &,uint32_t seed = DEFAULT_SEED);
+    void generate(uint32_t seed = DEFAULT_SEED) noexcept;
     void load(const std::string &path);
+    void save(const std::string &path) const;
 
     void handle_events(const std::vector<SDL_Event> &events, float delta_ticks_s);
-    void update_chunks();
 
     PhysicalWorld();
     ~PhysicalWorld();
@@ -118,7 +84,6 @@ struct PhysicalWorld {
 
 struct RenderWorld {
     std::unordered_map<glm::ivec2, MeshBuffer> meshes;
-    std::vector<MeshBuffer> empty_meshes;
     Texture orientation_texture;
 
     Texture blocks_texture;
@@ -126,7 +91,6 @@ struct RenderWorld {
     
     uint32_t globals_3d_ubo;
 
-    void update_chunks(PhysicalWorld &phys);
     void handle_events(const std::vector<SDL_Event> &events);
     void draw(PhysicalWorld &phys);
 

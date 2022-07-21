@@ -24,10 +24,8 @@ public:
     MeshBuffer& operator=(MeshBuffer rhs) noexcept;
     friend void swap(MeshBuffer &lhs, MeshBuffer &rhs) noexcept;
 
-    void rebuild(const Chunk &);
-
     void draw();
-    MeshBuffer(const Chunk&);
+    MeshBuffer(const BlockMesh &block_mess);
     MeshBuffer(uint32_t size);
     ~MeshBuffer();
 private:

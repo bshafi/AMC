@@ -60,8 +60,6 @@ public:
 
     AABB bounding_box() const;
     glm::vec3 world_pos() const;
-    static glm::vec3 chunk_pos_to_world_pos(glm::ivec2);
-    static glm::ivec2 world_pos_to_chunk_pos(glm::vec3);
 };
 
 bool chunk_contains(const Chunk &chunk, const glm::ivec3 &pos);
