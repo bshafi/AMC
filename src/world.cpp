@@ -287,7 +287,7 @@ void PhysicalWorld::update_chunks() {
         }
     }
 
-    glm::ivec2 camera_chunk_pos = Chunk::world_pos_to_chunk_pos(player.camera.pos());
+    glm::ivec2 camera_chunk_pos = Chunk::world_pos_to_chunk_pos(main_camera.pos());
 
     bool made_request = false;
     for (int i = -5; i <= 5; ++i)
@@ -380,10 +380,7 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
             selected_block_damage = BLOCK_DURABILITY;
         }
     }
-<<<<<<< HEAD
-=======
     */
->>>>>>> c5b485d (temp stash)
 }
 
 
@@ -494,15 +491,12 @@ PhysicalWorld::PhysicalWorld()
     : loader("saves/save0.hex") {
     selected_block_damage = BLOCK_DURABILITY;
 
-<<<<<<< HEAD
-=======
     {
         Entity main_player;
         main_player.controller = std::make_unique<PlayerController>();
         main_player.controller->init(main_player, *this);
         entities.emplace_back(std::move(main_player));
     }
->>>>>>> c5b485d (temp stash)
 }
 PhysicalWorld::~PhysicalWorld() {
 }

@@ -78,15 +78,10 @@ private:
 };
 
 struct PhysicalWorld {
-<<<<<<< HEAD
     std::unordered_set<glm::ivec2> requested_chunks;
     ChunkLoader loader;
     std::unordered_map<glm::ivec2, ChunkPtr> chunks;
     Player player;
-=======
-    std::unordered_map<glm::ivec2, Chunk> chunks;
-    //Player player;
->>>>>>> c5b485d (temp stash)
     std::optional<BlockHit> selected_block;
     std::vector<Entity> entities;
     int32_t selected_block_damage;
