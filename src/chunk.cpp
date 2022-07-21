@@ -188,6 +188,16 @@ glm::vec3 Chunk::world_pos() const {
     return glm::vec3(this->chunk_pos.x * CHUNK_WIDTH, 0, this->chunk_pos.y * CHUNK_WIDTH);
 }
 
+glm::vec3 Chunk::chunk_pos_to_world_pos(glm::ivec2 c) {
+    return glm::vec3(c.x * CHUNK_WIDTH, 0, c.y * CHUNK_WIDTH);
+}
+glm::ivec2 Chunk::world_pos_to_chunk_pos(glm::vec3 v) {
+    return glm::ivec2(
+        static_cast<int>(v.x / CHUNK_WIDTH),
+        static_cast<int>(v.y / CHUNK_WIDTH)
+    );
+}
+
 // FIXME: Chunk contains should check if pos is right
 bool chunk_contains(const Chunk &chunk, const glm::ivec3 &pos) {
     return (Chunk::MIN_X <= pos.x && pos.x <= Chunk::MAX_X) &&

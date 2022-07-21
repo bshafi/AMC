@@ -4,6 +4,64 @@
 #include "chunk.hpp"
 #include "mesh.hpp"
 
+struct BlockMeshIterator {
+    std::array<BlockVertex, 36> vertices;
+    glm::ivec3 pos;
+    BlockMeshIterator(const Chunk &);
+    bool next();
+    const Chunk &chunk;
+};
+
+BlockMeshIterator::BlockMeshIterator(const Chunk &chunk)
+    : pos(glm::ivec3()), chunk(chunk) {
+
+}
+bool BlockMeshIterator::next() {
+    const glm::ivec3 deltas[] = {
+        glm::ivec3(-1, 0, 0), 
+        glm::ivec3(1, 0, 0), 
+        glm::ivec3(0, -1, 0), 
+        glm::ivec3(0, 1, 0), 
+        glm::ivec3(0, 0, -1), 
+        glm::ivec3(0, 0, 1)
+    };
+
+    bool has_put_block = false;
+    while (Chunk::is_within_chunk_bounds(pos) && !has_put_block) {
+        BlockType block_type = chunk.GetBlock(pos);
+        if (block_type != BlockType::Air) {
+            bool is_surrounded = true;
+            for (uint32_t i = 0; i < 6; ++i) {
+                auto neighbor_pos = pos + deltas[i];
+                if (!Chunk::is_within_chunk_bounds(neighbor_pos)) {
+                    is_surrounded = false;
+                    break;
+                }
+                is_surrounded &= chunk.GetBlock(neighbor_pos) != BlockType::Air;
+            }
+            if (!is_surrounded) {
+                const glm::vec3 center = glm::vec3(pos) + glm::vec3(0.5f, 0.5f, 0.5f);
+
+                for (uint32_t i = 0; i < 36; ++i) {
+                    const uint32_t offset = i * 5;
+                    BlockVertex vertex = {
+                        center + glm::vec3(cube_vertices[offset + 0], cube_vertices[offset + 1], cube_vertices[offset + 2]),
+                        glm::vec2(cube_vertices[offset + 3], cube_vertices[offset + 4]),
+                        block_type,
+                        pos
+                    };
+                    this->vertices[i] = vertex;
+                }
+                has_put_block = true;
+            }
+        }
+
+        Chunk::loop_through(pos);
+    }
+
+    return has_put_block;
+}
+
 BlockMesh BlockMesh::Generate(const Chunk &chunk) {
     BlockMesh mesh;
     
@@ -48,6 +106,9 @@ BlockMesh BlockMesh::Generate(const Chunk &chunk) {
     return mesh;
 }
 
+void MeshBuffer::rebuild(const BlockMesh &block_mesh) {
+
+}
 
 MeshBuffer::MeshBuffer(MeshBuffer &&rhs) noexcept
     : vbo(0), vao(0), size(0), capacity(0) {
@@ -78,20 +139,59 @@ void MeshBuffer::draw() {
 
     ASSERT_ON_GL_ERROR();
 }
-MeshBuffer::MeshBuffer(const BlockMesh &block_mesh)
-    :  MeshBuffer(block_mesh.vertices.size()) {
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    for (uint32_t i = 0; i < block_mesh.vertices.size(); ++i) {
-        const auto vertex = block_mesh.vertices[i];
-        const uint32_t offset = i * BlockVertex::gl_size;
-        glBufferSubData(GL_ARRAY_BUFFER, offset, sizeof(glm::vec3), glm::value_ptr(vertex.position));
-        glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3), sizeof(glm::vec2), glm::value_ptr(vertex.tex_coords));
-        uint32_t block_id = static_cast<uint32_t>(vertex.block_id);
-        glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3) + sizeof(glm::vec2), sizeof(BlockType), &block_id);
-        glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3) + sizeof(glm::vec2) + sizeof(BlockType), sizeof(glm::ivec3), glm::value_ptr(vertex.original_location));
+
+uint32_t calc_verts(const Chunk &chunk) {
+    BlockMeshIterator bmi(chunk);
+
+    uint32_t i = 0;
+    while (bmi.next()) {
+        ++i;
     }
+
+    return i * 36;
+}
+
+MeshBuffer::MeshBuffer(const Chunk &chunk)
+    :  MeshBuffer(calc_verts(chunk)) {
+    ASSERT_ON_GL_ERROR();
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    ASSERT_ON_GL_ERROR();
+    
+    BlockMeshIterator bmi(chunk);
+    uint8_t buffer[BlockVertex::gl_size * 256];
+    uint32_t total_offset = 0;
+    uint32_t offset = 0;
+    uint32_t total_vertices = 0;
+    while (bmi.next()) {
+        for (uint32_t j = 0; j < 36; ++j) {
+            auto vertex = bmi.vertices[j];
+            memcpy(buffer + (offset), glm::value_ptr(vertex.position), sizeof(glm::vec3));
+            memcpy(buffer + (offset + sizeof(glm::vec3)), glm::value_ptr(vertex.tex_coords), sizeof(glm::vec2));
+            uint32_t block_id = static_cast<uint32_t>(vertex.block_id);
+            memcpy(buffer + (offset + sizeof(glm::vec3) + sizeof(glm::vec2)), &block_id, sizeof(BlockType));
+            memcpy(buffer + (offset + sizeof(glm::vec3) + sizeof(glm::vec2) + sizeof(BlockType)), glm::value_ptr(vertex.original_location), sizeof(glm::ivec3));
+            ++total_vertices;
+
+            offset += BlockVertex::gl_size;
+            if (offset + BlockVertex::gl_size >= sizeof(buffer)) {
+                glBufferSubData(GL_ARRAY_BUFFER, total_offset, offset, buffer);
+                ASSERT_ON_GL_ERROR();
+                total_offset += offset;
+                offset = 0;
+            }
+
+        }
+    }
+    if (offset > 0) {
+        glBufferSubData(GL_ARRAY_BUFFER, total_offset, offset, buffer);
+        ASSERT_ON_GL_ERROR();
+        total_offset += offset;
+        offset = 0;
+    }
+    ASSERT_ON_GL_ERROR();
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
-    size = block_mesh.vertices.size();
+    size = total_vertices;
 }
 MeshBuffer::MeshBuffer(uint32_t size) {
     ASSERT_ON_GL_ERROR();
@@ -102,7 +202,7 @@ MeshBuffer::MeshBuffer(uint32_t size) {
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBindVertexArray(vao);
 
-    glBufferData(GL_ARRAY_BUFFER, size * BlockVertex::gl_size, nullptr, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, size * BlockVertex::gl_size, nullptr, GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, BlockVertex::gl_size, (void*)0);
     glEnableVertexAttribArray(0);
 

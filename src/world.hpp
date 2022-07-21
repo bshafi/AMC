@@ -5,6 +5,7 @@
 #include <mutex>
 #include <fstream>
 #include <queue>
+#include <unordered_set>
 
 #include "standard.hpp"
 #include "camera.hpp"
@@ -48,34 +49,35 @@ private:
 
 using ChunkPtr = std::unique_ptr<Chunk>;
 
+void chunk_loader_loading_fn(std::string path);
 class ChunkLoader {
 public:
-    ChunkLoader(const std::string &s);
+    ChunkLoader(const std::string &path);
 
-    void load_chunks(glm::ivec2);
-    void unload_chunks(ChunkPtr &&);
+    bool ready_to_retrieve() const;
 
-    ChunkPtr retrieve_chunk();
-
-    int num_chunks_to_retrieve();
+    bool request_chunk(glm::ivec2);
+    bool request_unload(ChunkPtr &&);
+    void notify_request();
+    ChunkPtr retrive_chunk();
 private:
-    static void chunk_thread_fn(std::string);
-    static void initialize_chunk_thread(const std::string&);
-    static std::once_flag intialize_thread;
-    static std::thread chunk_thread;
+    friend void chunk_loader_loading_fn(std::string path);
 
-    static std::mutex chunks_to_load_lock;
-    static std::queue<glm::ivec2> chunks_to_load;
-    
-    static std::mutex chunks_to_unload_lock;
-    static std::queue<ChunkPtr> chunks_to_unload;
+    static std::thread loading_thread;
+    static std::once_flag loading_fn_init_flag;
 
-    static std::mutex chunks_to_retrieve_lock;
-    static std::queue<ChunkPtr> chunks_to_retrieve;
-    static std::atomic_int len_chunks_to_retrieve;
+    static std::mutex fullfilled_lock;
+    static std::condition_variable fullfilled_is_empty;
+    static std::vector<ChunkPtr> fullfilled_chunks;
+
+    static std::mutex request_lock;
+    static std::condition_variable has_made_request;
+    static std::queue<glm::ivec2> requested_chunks;
+    static std::queue<ChunkPtr> requested_unloads;
 };
 
 struct PhysicalWorld {
+    std::unordered_set<glm::ivec2> requested_chunks;
     ChunkLoader loader;
     std::unordered_map<glm::ivec2, ChunkPtr> chunks;
     Player player;
@@ -105,6 +107,7 @@ struct PhysicalWorld {
     void load(const std::string &path);
 
     void handle_events(const std::vector<SDL_Event> &events, float delta_ticks_s);
+    void update_chunks();
 
     PhysicalWorld();
     ~PhysicalWorld();

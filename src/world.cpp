@@ -192,81 +192,6 @@ SaveFile::~SaveFile() {
     file.close();
 }
 
-ChunkLoader::ChunkLoader(const std::string &s) {
-    std::call_once(intialize_thread, initialize_chunk_thread, std::ref(s));
-}
-void ChunkLoader::initialize_chunk_thread(const std::string &s) {
-    ChunkLoader::chunk_thread = std::thread(chunk_thread_fn, s);
-    ChunkLoader::chunk_thread.detach();
-}
-void ChunkLoader::load_chunks(glm::ivec2 p) {
-    std::scoped_lock l(chunks_to_load_lock);
-    chunks_to_load.push(p);
-}
-void ChunkLoader::unload_chunks(ChunkPtr &&chunk) {
-    std::scoped_lock l(chunks_to_unload_lock);
-    chunks_to_unload.emplace(std::move(chunk));
-}
-
-ChunkPtr ChunkLoader::retrieve_chunk() {
-    ChunkPtr chunk;
-    if (chunks_to_retrieve_lock.try_lock()) {
-        if (chunks_to_retrieve.size() > 0) {
-            chunk = std::move(chunks_to_retrieve.front());
-            chunks_to_retrieve.pop();
-        }
-        chunks_to_load_lock.unlock();
-    }
-    return chunk;
-}
-int ChunkLoader::num_chunks_to_retrieve() {
-    return len_chunks_to_retrieve.load(std::memory_order::memory_order_relaxed);
-}
-
-void ChunkLoader::chunk_thread_fn(std::string s) {
-    SaveFile save_file(s);
-    std::vector<glm::ivec2> r;
-
-    while (true) {
-        {
-            {
-                std::scoped_lock l(ChunkLoader::chunks_to_load_lock);
-                while (ChunkLoader::chunks_to_load.size() > 0) {
-                    auto p = chunks_to_load.front();
-                    r.push_back(p);
-                    chunks_to_load.pop();
-                }
-            }
-            if (r.size() > 0) {
-                auto p = r.back();
-                r.pop_back();
-                ChunkPtr chunk = std::make_unique<Chunk>();
-                if (!save_file.read_chunk(p, *chunk)) {
-                    PhysicalWorld::generate_chunk(p, *chunk);
-                }
-
-                std::scoped_lock l(ChunkLoader::chunks_to_retrieve_lock);
-                chunks_to_retrieve.emplace(std::move(chunk));
-                len_chunks_to_retrieve.fetch_add(1, std::memory_order::memory_order_relaxed);
-            }
-        }
-
-        using namespace std::chrono_literals;
-        std::this_thread::sleep_for(1000ms);
-    }
-}
-std::once_flag ChunkLoader::intialize_thread;
-std::thread ChunkLoader::chunk_thread = std::thread();
-std::mutex ChunkLoader::chunks_to_load_lock;
-std::queue<glm::ivec2>ChunkLoader::chunks_to_load = {};
-
-std::mutex ChunkLoader::chunks_to_unload_lock;
-std::queue<ChunkPtr> ChunkLoader::chunks_to_unload = {};
-
-std::mutex ChunkLoader::chunks_to_retrieve_lock;
-std::queue<ChunkPtr> ChunkLoader::chunks_to_retrieve = {};
-std::atomic_int ChunkLoader::len_chunks_to_retrieve = { 0 };
-
 glm::vec3 PhysicalWorld::try_move_to(const glm::vec3 &pos, const glm::vec3 &delta_pos, const AABB &aabb) const {
     glm::vec3 new_pos = pos;
     glm::vec3 components[] = { glm::vec3(1, 0, 0), glm::vec3(0, 1, 0), glm::vec3(0, 0, 1) };
@@ -354,14 +279,46 @@ void PhysicalWorld::SetBlock(const BlockHit &block_handle, BlockType type) {
 }
 
 
-void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float delta_time_s) {
-    if (loader.num_chunks_to_retrieve() > 0) {
-        ChunkPtr chunk = loader.retrieve_chunk();
+void PhysicalWorld::update_chunks() {
+    {
+        ChunkPtr chunk = loader.retrive_chunk();
         if (chunk != nullptr) {
-            
+            requested_chunks.erase(chunk->chunk_pos);
             chunks.emplace(std::make_pair<glm::ivec2, ChunkPtr>(glm::ivec2(chunk->chunk_pos), std::move(chunk)));
         }
     }
+
+    glm::ivec2 camera_chunk_pos = Chunk::world_pos_to_chunk_pos(player.camera.pos());
+
+    bool made_request = false;
+    for (int i = -5; i <= 5; ++i)
+        for (int j =  -5; j <=5; ++j) {
+            auto pos = glm::ivec2(i, j) + camera_chunk_pos;
+            if (chunks.find(pos) == chunks.end() && requested_chunks.find(pos) == requested_chunks.end()) {
+                loader.request_chunk(pos);
+                requested_chunks.insert(pos);
+                made_request = true;
+            }
+        }
+
+    for (auto a = chunks.begin(); a != chunks.end();) {
+        auto diff = a->first - camera_chunk_pos;
+        auto manhattan_dist = abs(diff.x) + abs(diff.y);
+        if (manhattan_dist > 10) {
+            loader.request_unload(std::move(a->second));
+            made_request = true;
+            a = chunks.erase(a);
+        } else {
+            ++a;
+        }
+    }
+
+    if (made_request) {
+        loader.notify_request();
+    }
+}
+void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float delta_time_s) {
+    update_chunks();
 
     bool space_pressed = false;
     for (const auto &event : events) {
@@ -474,24 +431,118 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
             selected_block_damage = BLOCK_DURABILITY;
         }
     }
-
 }
 
-PhysicalWorld::PhysicalWorld() 
+
+void chunk_loader_loading_fn(std::string path) {
+    std::vector<ChunkPtr> empty_chunks;
+
+    SaveFile save_file(path);
+
+    std::vector<ChunkPtr> loading_thread_fullfilled_chunks;
+
+    std::queue<glm::ivec2> temp_requested_chunks;
+    std::queue<ChunkPtr> temp_requested_unloads;
+
+    while (true) {
+        {
+            std::unique_lock lk(ChunkLoader::request_lock);
+            ChunkLoader::has_made_request.wait(lk);
+
+            std::swap(temp_requested_chunks, ChunkLoader::requested_chunks);
+            std::swap(temp_requested_unloads, ChunkLoader::requested_unloads);
+        }
+
+        while (!temp_requested_unloads.empty()) {
+            save_file.write_chunk(*temp_requested_unloads.front());
+            empty_chunks.emplace_back(std::move(temp_requested_unloads.front()));
+            temp_requested_unloads.pop();
+        }
+        while (!temp_requested_chunks.empty()) {
+            glm::ivec2 chunk_pos = temp_requested_chunks.front();
+            temp_requested_chunks.pop();
+            
+            ChunkPtr chunk;
+            if (empty_chunks.empty()) {
+                chunk = std::make_unique<Chunk>();
+            } else {
+                chunk = std::move(empty_chunks.back());
+                empty_chunks.pop_back();
+            }
+
+            if (!save_file.read_chunk(chunk_pos, *chunk)) {
+                PhysicalWorld::generate_chunk(chunk_pos, *chunk);
+            }
+            loading_thread_fullfilled_chunks.push_back(std::move(chunk));
+        }
+
+        if (!loading_thread_fullfilled_chunks.empty()) {
+            std::unique_lock lk(ChunkLoader::fullfilled_lock);
+            ChunkLoader::fullfilled_is_empty.wait(lk);
+            std::swap(loading_thread_fullfilled_chunks, ChunkLoader::fullfilled_chunks);
+        }
+    }
+}
+ChunkPtr ChunkLoader::retrive_chunk() {
+    ChunkPtr chunk;
+    if (fullfilled_lock.try_lock()) {
+        if (fullfilled_chunks.empty()) {
+            fullfilled_is_empty.notify_one();
+        } else {
+            chunk = std::move(fullfilled_chunks.back());
+            fullfilled_chunks.pop_back();
+        }
+
+        fullfilled_lock.unlock();
+    }
+
+    return chunk;
+}
+bool ChunkLoader::request_chunk(glm::ivec2 v) {
+    if (request_lock.try_lock()) {
+        requested_chunks.push(v);
+        request_lock.unlock();
+        return true;
+    }
+    return false;
+}
+bool ChunkLoader::request_unload(ChunkPtr &&p) {
+    if (request_lock.try_lock()) {
+        requested_unloads.emplace(std::move(p));
+        request_lock.unlock();
+        return true;
+    }
+    return false;
+}
+void ChunkLoader::notify_request() {
+    has_made_request.notify_one();
+}
+
+ChunkLoader::ChunkLoader(const std::string &path) {
+    std::call_once(loading_fn_init_flag, [&path]() {
+        loading_thread = std::thread(chunk_loader_loading_fn, path);
+    });
+}
+
+std::thread ChunkLoader::loading_thread;
+std::once_flag ChunkLoader::loading_fn_init_flag;
+
+std::mutex ChunkLoader::fullfilled_lock;
+std::condition_variable ChunkLoader::fullfilled_is_empty;
+std::vector<ChunkPtr> ChunkLoader::fullfilled_chunks;
+
+std::mutex ChunkLoader::request_lock;
+std::condition_variable ChunkLoader::has_made_request;
+std::queue<glm::ivec2> ChunkLoader::requested_chunks;
+std::queue<ChunkPtr> ChunkLoader::requested_unloads;
+
+
+PhysicalWorld::PhysicalWorld()
     : loader("saves/save0.hex") {
     selected_block_damage = BLOCK_DURABILITY;
 
-    for (int i = 0; i < 5; ++i)
-        for (int j = 0; j < 5; ++j) {
-            loader.load_chunks(glm::ivec2(i, j));
-        }
 }
 PhysicalWorld::~PhysicalWorld() {
-    /*
-    for (const auto &[pos, chunk] : chunks) {
-        save_file.write_chunk(*chunk);
-    }
-    */
 }
 
 
@@ -568,7 +619,7 @@ void RenderWorld::handle_events(const std::vector<SDL_Event> &events) {
 void RenderWorld::draw(PhysicalWorld &phys) {
     for (const auto &[key, chunk] : phys.chunks) {
         if (meshes.find(key) == meshes.end()) {
-            meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk->chunk_pos), (MeshBuffer(BlockMesh::Generate(*chunk)))));
+            meshes.emplace(std::make_pair<glm::ivec2, MeshBuffer>(glm::ivec2(chunk->chunk_pos), (MeshBuffer(*chunk))));
         }
     }
 
