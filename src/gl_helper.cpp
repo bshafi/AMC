@@ -60,6 +60,8 @@ SDL_Window* Init_SDL_and_GL(const char *title, uint32_t width, uint32_t height) 
         int w, h;
         SDL_GL_GetDrawableSize(window, &w, &h);
         filter_data.true_window_bounds = glm::uvec2(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+        SDL_GetWindowSize(window, &w, &h);
+        filter_data.fake_window_bounds = glm::uvec2(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
 
         filter_data.context = SDL_GL_CreateContext(window);
         assert(filter_data.context);
