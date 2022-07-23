@@ -99,6 +99,73 @@
 #error "SDL_BYTEORDER not defined"
 #endif
 
+template <>
+std::string read_binary(std::istream &is) {
+    uint32_t len = read_binary<uint32_t>(is);
+    std::string s;
+    s.reserve(len);
+    for (uint32_t i = 0; i < len; ++i) {
+        uint8_t c = read_binary<uint8_t>(is);
+        s.push_back(c);
+    }
+    return s;
+}
+
+template <>
+std::ostream& write_binary<std::string>(std::ostream &os, const std::string &s) {
+    write_binary<uint32_t>(os, s.size());
+    for (uint32_t i = 0; i < s.size(); ++i) {
+        write_binary<uint8_t>(os, static_cast<uint8_t>(s[i]));
+    }
+}
+
+template <>
+vec2 read_binary(std::istream &is) {
+    return vec2(
+        read_binary<float>(is),
+        read_binary<float>(is)
+    );
+}
+
+template <>
+std::ostream& write_binary(std::ostream &os, const vec2 &v) {
+    write_binary<float>(os, v.x);
+    write_binary<float>(os, v.y);
+}
+
+
+template <>
+vec3 read_binary(std::istream &is) {
+    return vec3(
+        read_binary<float>(is),
+        read_binary<float>(is),
+        read_binary<float>(is)
+    );
+}
+
+template <>
+std::ostream& write_binary(std::ostream &os, const vec3 &v) {
+    write_binary<float>(os, v.x);
+    write_binary<float>(os, v.y);
+    write_binary<float>(os, v.z);
+}
+
+
+template <>
+glm::quat read_binary(std::istream &is) {
+    return glm::quat(
+        read_binary<float>(is),
+        read_binary<float>(is),
+        read_binary<float>(is),
+        read_binary<float>(is)
+    );
+}
+std::ostream& write_binary(std::ostream &os, const glm::quat &v) {
+    write_binary<float>(os, v.x);
+    write_binary<float>(os, v.y);
+    write_binary<float>(os, v.z);
+    write_binary<float>(os, v.w);
+}
 
 float roundup(float x) {
     return floor(x + 0.001f) + 1;

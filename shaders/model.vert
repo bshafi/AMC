@@ -7,11 +7,12 @@ layout (location = 2) in uint texture_id;
 layout (std140) uniform globals_3d {
     mat4x4 view;
     mat4x4 projection;
-    mat4x4 model;
 };
 
 out vec2 tex_coords;
 flat out uint tex_id;
+
+uniform mat4 model;
 
 void main() {
     tex_id = texture_id;

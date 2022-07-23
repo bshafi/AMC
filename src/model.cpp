@@ -1,3 +1,5 @@
+#include <fstream>
+
 #include "gl_helper.hpp"
 
 #include "model.hpp"
@@ -98,6 +100,18 @@ void MCModelPart::serialize(std::ostream &os) const {
     write_binary<uint32_t>(os, 0);
 }
 
+EditableMCModel::EditableMCModel(const std::string &s) {
+    std::ifstream fistream(s, std::ios_base::binary);
+    fistream.exceptions(~std::ios_base::goodbit);
+    while (true) {
+        auto bob = MCModelPart::deserialize(fistream);
+        if (bob == std::nullopt) {
+            break;
+        }
+        models[bob->id] = *bob;
+    }
+}
+
 struct MCMModelGraph {
     const MCModelPart *model;
     std::vector<MCMModelGraph> children;
@@ -148,43 +162,14 @@ ModelRenderer::ModelRenderer()
 
     ASSERT_ON_GL_ERROR();
 
-    glGenBuffers(1, &globals_3d_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);ASSERT_ON_GL_ERROR();
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 3, nullptr, GL_STATIC_DRAW);ASSERT_ON_GL_ERROR();
-
-    glm::mat4 view = camera.view_matrix();ASSERT_ON_GL_ERROR();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));ASSERT_ON_GL_ERROR();
-
-    glm::uvec2 win_size = GetTrueWindowSize();
-    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(win_size.x) / static_cast<float>(win_size.y), 0.1f, 100.f);ASSERT_ON_GL_ERROR();
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));ASSERT_ON_GL_ERROR();
-
-    glm::mat4 model = glm::identity<glm::mat4>();
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, sizeof(glm::mat4), glm::value_ptr(model));
-
-
-    ASSERT_ON_GL_ERROR();
-
-    this->shader.bind_UBO("globals_3d", 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
-
     ASSERT_ON_GL_ERROR();
 }
 
-void ModelRenderer::draw(const std::unordered_map<uint32_t, MCModelPart> &models, Texture *texture) {
+void ModelRenderer::draw(const std::unordered_map<uint32_t, MCModelPart> &models, Texture *texture, vec3 pos) {
     ASSERT_ON_GL_ERROR();
-     
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glm::mat4 view = camera.view_matrix();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
 
+    shader.use();
 
-    glm::uvec2 win_size = GetTrueWindowSize();
-    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(win_size.x) / static_cast<float>(win_size.y), 0.1f, 100.f);ASSERT_ON_GL_ERROR();
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));ASSERT_ON_GL_ERROR();
-
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    
     ASSERT_ON_GL_ERROR();
 
 
@@ -194,13 +179,14 @@ void ModelRenderer::draw(const std::unordered_map<uint32_t, MCModelPart> &models
         shader.bind_texture_to_sampler_2D({
             { "textures[0]", *texture }
         });
-        shader.use();
     }
-
+    shader.use();
+    
     for (size_t i = graph.children.size(); i > 0;) {
         --i;
 
-        draw(graph.children[i], glm::identity<glm::mat4>());
+        auto partent = glm::identity<glm::mat4>();
+        draw(graph.children[i], glm::translate(partent, pos));
     }
  
     shader.use();
@@ -209,18 +195,11 @@ void ModelRenderer::draw(const std::unordered_map<uint32_t, MCModelPart> &models
 
 void ModelRenderer::draw(const MCMModelGraph &graph, glm::mat4 parent) {
     ASSERT_ON_GL_ERROR();
-     
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
+
+    auto h_model = shader.retrieve_shader_variable<glm::mat4>("model");
+
     glm::mat4 model_mat = graph.model->model_matrix(parent);
-    glBufferSubData(GL_UNIFORM_BUFFER, 2 * sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(model_mat));
-
-    glm::mat4 view = camera.view_matrix();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-
-
-    glm::uvec2 win_size = GetTrueWindowSize();
-    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(win_size.x) / static_cast<float>(win_size.y), 0.1f, 100.f);ASSERT_ON_GL_ERROR();
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));ASSERT_ON_GL_ERROR();
+    h_model.set(model_mat);
 
     unit_cube_mesh.rebuild(CreateCubeMesh({ 1.f, 1.f, 1.f }, { 0.f, 0.f, 0.f }, graph.model->uvs));
 

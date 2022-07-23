@@ -121,6 +121,9 @@ struct PhysicalWorld {
 };
 
 struct RenderWorld {
+    EditableMCModel zombie_model;
+    Texture zombie_texture;
+    ModelRenderer model_renderer;
     std::unordered_map<glm::ivec2, MeshBuffer> meshes;
     std::vector<MeshBuffer> empty_meshes;
     Texture orientation_texture;

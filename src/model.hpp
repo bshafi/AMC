@@ -28,8 +28,10 @@ struct MCModelPart {
     void serialize(std::ostream &os) const;
 };
 
-struct FullMCModel {
+struct EditableMCModel {
     std::unordered_map<uint32_t, MCModelPart> models;
+
+    EditableMCModel(const std::string&);
 };
 
 
@@ -37,12 +39,10 @@ struct MCMModelGraph;
 
 struct ModelRenderer {
     ModelRenderer();
-    void draw(const std::unordered_map<uint32_t, MCModelPart> &models, Texture *texture = nullptr);
+    void draw(const std::unordered_map<uint32_t, MCModelPart> &models, Texture *texture = nullptr, vec3 pos = { 0.f, 0.f, 0.f });
     void draw(const MCMModelGraph &, glm::mat4 parent);
 
     Shader shader;
-    uint32_t globals_3d_ubo;
     Camera camera;
     MeshBuffer unit_cube_mesh;
 };
-

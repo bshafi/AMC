@@ -4,6 +4,16 @@
 #include "standard.hpp"
 #include "player.hpp"
 
+std::optional<Entity> Entity::create(const std::string &name) {
+    std::optional<Entity> ret;
+    if (name == "player") {
+        ret = Entity();
+        ret->controller = std::make_unique<PlayerController>();
+        ret->type = EntityType::Player;
+    }
+
+    return ret;
+}
 
 bool rect_intersects(const PhysicalWorld &phys, const std::vector<Entity> &entities, size_t i, BoundingBox box) {
     for (size_t j = 0; j < entities.size(); ++j) {

@@ -15,6 +15,8 @@
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
 
+uint32_t generate_ubo(Shader &shader, glm::mat4 view);
+void update_ubo_matrices(uint32_t ubo, glm::mat4 view);
 
 int main() {
     SDL_Window *window = Init_SDL_and_GL("Animation Editor", 1280, 720);
@@ -38,6 +40,10 @@ int main() {
     SDL_GL_GetDrawableSize(window, &width, &height);
     glViewport(0, 0, width, height);
 
+    ASSERT_ON_GL_ERROR();
+
+    uint32_t globals_3d_ubo = generate_ubo(renderer.shader, renderer.camera.view_matrix());
+    
     ASSERT_ON_GL_ERROR();
 
     uint32_t ticks = SDL_GetTicks();
@@ -102,16 +108,10 @@ int main() {
                         auto res = pfd::open_file("Open mcmodel", "", { ".mcmodel" });
                         auto results = res.result();
                         if (results.size() > 0) {
-                            path = results[0];
-                            std::ifstream fistream(results[0], std::ios_base::binary);
-                            fistream.exceptions(~std::ios_base::goodbit);
-                            while (true) {
-                                auto bob = MCModelPart::deserialize(fistream);
-                                if (bob == std::nullopt) {
-                                    break;
-                                }
-                                model_groups[bob->id] = *bob;
-                                model_id = std::max(model_id, static_cast<int>(bob->id));
+                            EditableMCModel full(results[0]);
+                            model_groups = full.models;
+                            for (const auto &[id, model] : model_groups) {
+                                model_id = std::max(model_id, static_cast<int>(id));
                             }
                         }
                     }
@@ -266,6 +266,8 @@ int main() {
         if (texture != std::nullopt) {
             tex = &*texture;
         }
+        update_ubo_matrices(globals_3d_ubo, renderer.camera.view_matrix());
+
         renderer.draw(model_groups, tex);
 
         ASSERT_ON_GL_ERROR();
@@ -288,3 +290,4 @@ int main() {
     Quit_SDL_and_GL();
     return 0;
 }
+

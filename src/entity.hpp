@@ -16,13 +16,20 @@ public:
 private:
 };
 
+enum class EntityType {
+    Player = 0,
+    Zombie
+};
+
 class Entity {
 public:
+    static std::optional<Entity> create(const std::string &name);
+
     Transform transform;
     Rigidbody rigidbody;
 
     std::unique_ptr<EntityController> controller;
-    std::optional<FullMCModel> model;
+    EntityType type;
 private:
     friend void update_entities(PhysicalWorld &phys, std::vector<Entity> &, float dt);
 };

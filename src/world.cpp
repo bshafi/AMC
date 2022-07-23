@@ -492,8 +492,7 @@ PhysicalWorld::PhysicalWorld()
     selected_block_damage = BLOCK_DURABILITY;
 
     {
-        Entity main_player;
-        main_player.controller = std::make_unique<PlayerController>();
+        Entity main_player = *Entity::create("player");
         main_player.controller->init(main_player, *this);
         entities.emplace_back(std::move(main_player));
     }
@@ -604,12 +603,9 @@ void RenderWorld::draw(PhysicalWorld &phys) {
 
     ASSERT_ON_GL_ERROR();
      
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glm::mat4 view = phys.main_camera.view_matrix();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    
+    update_ubo_matrices(globals_3d_ubo, phys.main_camera.view_matrix());
     ASSERT_ON_GL_ERROR();
+
 
     shader.bind_texture_to_sampler_2D({
         { "orientation", orientation_texture },
@@ -625,7 +621,7 @@ void RenderWorld::draw(PhysicalWorld &phys) {
     float RENDER_DISTANCE = PhysicalWorld::RENDER_DISTANCE * Chunk::CHUNK_WIDTH;
 
 
-
+    
     for (auto &[chunk_pos, mesh_buffer] : this->meshes) {
         if (glm::length(glm::vec2(phys.main_camera.pos().x, phys.main_camera.pos().z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
             continue;
@@ -646,6 +642,14 @@ void RenderWorld::draw(PhysicalWorld &phys) {
     phys.inventory.draw(frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) }, 0);
 
     ASSERT_ON_GL_ERROR();
+    
+    //model_renderer.camera = phys.main_camera;
+    for (const auto &entity : phys.entities) {
+        if (entity.type == EntityType::Player) {
+            model_renderer.draw(zombie_model.models, &zombie_texture, phys.main_camera.pos() + phys.main_camera.forward());
+        }
+    }
+    
 
 #ifdef ENABLE_IMGUI
     ImGui::Begin("World");
@@ -676,11 +680,12 @@ void RenderWorld::draw(PhysicalWorld &phys) {
 #endif
 }
 
-RenderWorld::RenderWorld(PhysicalWorld &phys) : 
+RenderWorld::RenderWorld(PhysicalWorld &phys) :
+    zombie_model("resources/zombie.mcmodel"),
+    zombie_texture("resources/zombie.png"),
     orientation_texture("resources/hello_cube_orientation.png"),
     blocks_texture("resources/blocks.png"),
     shader("shaders/block.vert", "shaders/chunk.frag") {
-
 
     ASSERT_ON_GL_ERROR();
 
@@ -692,22 +697,7 @@ RenderWorld::RenderWorld(PhysicalWorld &phys) :
 
     ASSERT_ON_GL_ERROR();
 
-    glGenBuffers(1, &globals_3d_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
-    glm::mat4 view = phys.main_camera.view_matrix();
-
-    glm::uvec2 win_size = GetTrueWindowSize();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(win_size.x) / static_cast<float>(win_size.y), 0.1f, 100.f);
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
-
-    this->shader.bind_UBO("globals_3d", 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
-
-    this->shader.bind_UBO("globals_3d", 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
-
+    globals_3d_ubo = generate_ubo(shader, phys.main_camera.view_matrix());
     ASSERT_ON_GL_ERROR();
 }
 RenderWorld::~RenderWorld() {
