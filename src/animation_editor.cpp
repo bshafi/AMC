@@ -14,9 +14,22 @@
 #include "imgui.h"
 #include "imgui_impl_opengl3.h"
 #include "imgui_impl_sdl.h"
+#include "imgui_stdlib.h"
 
-uint32_t generate_ubo(Shader &shader, glm::mat4 view);
-void update_ubo_matrices(uint32_t ubo, glm::mat4 view);
+namespace ImGui {
+    void InputString(const char *, std::string &s);
+}
+
+struct KeyFrame {
+    float time;
+    uint32_t cube_id;
+};
+
+struct Animation {
+    std::vector<KeyFrame> key_frames;
+    float length;
+};
+
 
 int main() {
     SDL_Window *window = Init_SDL_and_GL("Animation Editor", 1280, 720);
@@ -33,6 +46,8 @@ int main() {
 
     std::optional<std::string> path;
     std::optional<Texture> texture;
+
+    std::unordered_map<std::string, Animation> animations;
 
     assert(window);
 
@@ -258,6 +273,51 @@ int main() {
             }
 
             ImGui::End();
+
+            static std::string selected_animation = "";
+            ImGui::Begin("Animation Editor");
+            auto tl = ImGui::GetCursorScreenPos();
+
+            auto win_size = ImGui::GetWindowSize();
+            ImGui::BeginChild("Animations", ImVec2(std::min<int>(200, win_size.x / 5), 0));
+            if (ImGui::Button("Add Animation")) {
+                animations[std::to_string(animations.size())] = Animation{};
+            }
+            if (animations.find(selected_animation) != animations.end()) {
+                auto old_selected_animation = selected_animation;
+                ImGui::InputText("name", &selected_animation);
+                if (old_selected_animation != selected_animation) {
+                    Animation anim = animations[old_selected_animation];
+                    animations.erase(old_selected_animation);
+                    animations[selected_animation] = anim;
+                }
+            }
+            for (const auto &[name, animation] : animations) {
+                if (ImGui::Selectable(name.c_str(), name == selected_animation)) {
+                    selected_animation = name;
+                }
+            }
+            ImGui::EndChild();
+            ImGui::SameLine();
+
+            static float time_cursor = 0.f;
+            if (animations.find(selected_animation) != animations.end()) {
+                auto &anim = animations[selected_animation];
+                tl = ImGui::GetCursorScreenPos();
+                
+                ImGui::BeginChild("Animation Info", ImVec2(std::min<int>(200, win_size.x / 5), 0));
+                ImGui::DragFloat("length", &anim.length);
+
+                ImGui::EndChild();
+                ImGui::SameLine();
+            }
+            
+            auto br = ImVec2(tl.x + win_size.x - 20, tl.y + win_size.y - 30);
+            tl = ImGui::GetCursorScreenPos();
+            draw_list = ImGui::GetWindowDrawList();
+            draw_list->AddRect(tl, br, 0xffffffff);
+
+            ImGui::End();
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -290,4 +350,5 @@ int main() {
     Quit_SDL_and_GL();
     return 0;
 }
+
 

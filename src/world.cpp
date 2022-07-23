@@ -646,7 +646,7 @@ void RenderWorld::draw(PhysicalWorld &phys) {
     //model_renderer.camera = phys.main_camera;
     for (const auto &entity : phys.entities) {
         if (entity.type == EntityType::Player) {
-            model_renderer.draw(zombie_model.models, &zombie_texture, phys.main_camera.pos() + phys.main_camera.forward());
+            model_renderer.draw(zombie_model.models, &zombie_texture, phys.main_camera.pos() - glm::vec3(0, 1.f, 0));
         }
     }
     

@@ -24,6 +24,7 @@ list(APPEND CPP_FILES
   src/imgui_draw.cpp src/imgui_demo.cpp src/imgui_tables.cpp src/imgui_impl_sdl.cpp
   src/imgui_impl_opengl3.cpp src/mesh.cpp
   src/physics.cpp src/entity.cpp src/model.cpp
+  src/imgui_stdlib.cpp
 )
 
 
