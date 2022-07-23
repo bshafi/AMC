@@ -106,6 +106,51 @@ BlockMesh BlockMesh::Generate(const Chunk &chunk) {
     return mesh;
 }
 
+
+glm::vec2 get_uv_from_face(glm::vec4 face, uint32_t i) {
+    assert(i < 6);
+    //assert(which_face < 6);
+
+    // Upper triangle: |--
+    //                 |/
+
+    // Lower triangle:  /|
+    //                 --|
+    vec2 pos = { face.x, face.y };
+    vec2 bounds = { face.z, face.w };
+
+    glm::vec2 tri[6] = {
+        pos + vec2(0, 0),
+        pos + vec2(0, bounds.y),
+        pos + vec2(bounds.x, bounds.y),
+        pos + vec2(0, 0),
+        pos + vec2(bounds.x, bounds.y),
+        pos + vec2(bounds.x, 0),
+    };
+
+    return vec2(1.f, -1.f) * (tri[i] - (pos + bounds / 2.f)) + (pos + bounds / 2.f);
+}
+
+
+Mesh CreateCubeMesh(glm::vec3 size, glm::vec3 pos, std::array<glm::vec4, 6> faces) {
+    Mesh mesh;
+    for (size_t i = 0; i < cube_vertices.size() / 5; ++i) {
+        size_t which_face = i / 6;
+        vec3 v_pos = {
+            cube_vertices[i * 5 + 0],
+            cube_vertices[i * 5 + 1],
+            cube_vertices[i * 5 + 2]
+        };
+        mesh.vertices.push_back(Vertex{
+            v_pos * size + pos,
+            get_uv_from_face(faces[which_face], i % 6),
+            0
+        });
+    }
+
+    return mesh;
+}
+
 MeshBuffer::MeshBuffer(MeshBuffer &&rhs) noexcept
     : vbo(0), vao(0), size(0), capacity(0) {
     swap(*this, rhs);
@@ -231,6 +276,67 @@ MeshBuffer::MeshBuffer(uint32_t size) {
 
     this->size = 0;
     capacity = size;
+}
+MeshBuffer::MeshBuffer(const Mesh &mesh) {
+    size = mesh.vertices.size();
+    capacity = size;
+
+    ASSERT_ON_GL_ERROR();
+
+    glGenBuffers(1, &vbo);
+    glGenVertexArrays(1, &vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindVertexArray(vao);
+
+    glBufferData(GL_ARRAY_BUFFER, size * Vertex::gl_size, nullptr, GL_STATIC_DRAW);
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+        const auto vertex = mesh.vertices[i];
+        const uint32_t offset = i * Vertex::gl_size;
+        glBufferSubData(GL_ARRAY_BUFFER, offset, sizeof(glm::vec3), glm::value_ptr(vertex.vertex_position));
+        glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3), sizeof(glm::vec2), glm::value_ptr(vertex.texture_coordinate));
+        glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3) + sizeof(glm::vec2), sizeof(uint32_t), &vertex.texture_id);
+    }
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, Vertex::gl_size, (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, Vertex::gl_size, (void*)(sizeof(glm::vec3)));
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, Vertex::gl_size, (void*)(sizeof(glm::vec2) + sizeof(glm::vec3)));
+    glEnableVertexAttribArray(2);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    ASSERT_ON_GL_ERROR();
+
+}
+
+void MeshBuffer::rebuild(const Mesh &mesh) {
+    assert(mesh.vertices.size() == this->size);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindVertexArray(vao);
+
+    for (size_t i = 0; i < mesh.vertices.size(); ++i) {
+        const auto vertex = mesh.vertices[i];
+        const uint32_t offset = i * Vertex::gl_size;
+        glBufferSubData(GL_ARRAY_BUFFER, offset, sizeof(glm::vec3), glm::value_ptr(vertex.vertex_position));
+        glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3), sizeof(glm::vec2), glm::value_ptr(vertex.texture_coordinate));
+        glBufferSubData(GL_ARRAY_BUFFER, offset + sizeof(glm::vec3) + sizeof(glm::vec2), sizeof(uint32_t), &vertex.texture_id);
+    }
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, Vertex::gl_size, (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, Vertex::gl_size, (void*)(sizeof(glm::vec3)));
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, Vertex::gl_size, (void*)(sizeof(glm::vec2) + sizeof(glm::vec3)));
+    glEnableVertexAttribArray(2);
+
+    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 MeshBuffer::~MeshBuffer() {
     glDeleteBuffers(1, &vbo);

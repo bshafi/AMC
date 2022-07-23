@@ -67,6 +67,7 @@ void Shader::bind_texture_to_sampler_2D(const std::vector<std::pair<std::string,
 }
 
 void Shader::bind_UBO(const std::string &ubo_name, unsigned int loc) {
+    ASSERT_ON_GL_ERROR();
     auto index = glGetUniformBlockIndex(this->shader_program, ubo_name.c_str());
     glUniformBlockBinding(this->shader_program, index, loc);
 
@@ -164,3 +165,35 @@ void GLFunctionsWrapper::setmat4x4(int loc, const glm::mat4x4 &m) {
     glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(m));
 }
 
+
+
+uint32_t generate_ubo(Shader &shader, glm::mat4 view) {
+    ASSERT_ON_GL_ERROR();
+
+    uint32_t globals_3d_ubo;
+    glGenBuffers(1, &globals_3d_ubo);
+    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
+    glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
+
+    glm::uvec2 win_size = GetTrueWindowSize();
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
+    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(win_size.x) / static_cast<float>(win_size.y), 0.1f, 100.f);
+    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
+
+    shader.bind_UBO("globals_3d", 0);
+    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
+
+    ASSERT_ON_GL_ERROR();
+
+    return globals_3d_ubo;
+}
+void update_ubo_matrices(uint32_t globals_3d_ubo, glm::mat4 view) {
+    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
+
+    glm::uvec2 win_size = GetTrueWindowSize();
+    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), static_cast<float>(win_size.x) / static_cast<float>(win_size.y), 0.1f, 100.f);
+    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
+
+    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
+    glBindBuffer(GL_UNIFORM_BUFFER, 0);
+}

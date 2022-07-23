@@ -170,3 +170,6 @@ T Uniform<T>::get() const {
         static_assert(always_false<T>::value, "Type has not been implemented");
     }
 }
+
+uint32_t generate_ubo(Shader &shader, glm::mat4 view);
+void update_ubo_matrices(uint32_t globals_3d_ubo, glm::mat4 view);

@@ -25,7 +25,7 @@ struct FilterData {
     SDL_GLContext context;
 } filter_data;
 
-SDL_Window *Init_SDL_and_GL() {
+SDL_Window* Init_SDL_and_GL(const char *title, uint32_t width, uint32_t height) {
     SDL_SetMainReady();
     assert(SDL_Init(DEFAULT_SDL_INIT_FLAGS) == 0);
     assert(IMG_Init(DEFAULT_IMG_INIT_FLAGS) == DEFAULT_IMG_INIT_FLAGS);
@@ -47,11 +47,11 @@ SDL_Window *Init_SDL_and_GL() {
 
 
     SDL_Window *window = SDL_CreateWindow(
-        "Another Minecraft Clone", 
+        title, 
         SDL_WINDOWPOS_CENTERED,
         SDL_WINDOWPOS_CENTERED, 
-        INITIAL_WINDOW_WIDTH,
-        INITIAL_WINDOW_HEIGHT, 
+        width,
+        height, 
         DEFAULT_SDL_WINDOW_FLAGS
     );
 
@@ -60,6 +60,8 @@ SDL_Window *Init_SDL_and_GL() {
         int w, h;
         SDL_GL_GetDrawableSize(window, &w, &h);
         filter_data.true_window_bounds = glm::uvec2(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+        SDL_GetWindowSize(window, &w, &h);
+        filter_data.fake_window_bounds = glm::uvec2(static_cast<uint32_t>(w), static_cast<uint32_t>(h));
 
         filter_data.context = SDL_GL_CreateContext(window);
         assert(filter_data.context);
@@ -80,11 +82,7 @@ SDL_Window *Init_SDL_and_GL() {
     SDL_SetEventFilter(
         [](void *userdata, SDL_Event *event){
             FilterData *filter_data = static_cast<FilterData*>(userdata);
-            filter_data->filter_mutex.lock();
-
             *event = filter_events(filter_data->fake_window_bounds, filter_data->true_window_bounds, *event);
-
-            filter_data->filter_mutex.unlock();
             return 1;
         },
         &filter_data
@@ -322,9 +320,7 @@ bool glBreakOnError() {
     return true;
 }
 glm::uvec2 GetTrueWindowSize() {
-    filter_data.filter_mutex.lock();
     auto window_size = filter_data.true_window_bounds;
-    filter_data.filter_mutex.unlock();
 
     return window_size;
 }

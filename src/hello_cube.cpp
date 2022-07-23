@@ -4,6 +4,8 @@
 #include "hello_cube.hpp"
 
 const std::array<float, 6 * 6 * 5> cube_vertices = {
+
+    // Top
     -0.5f,  0.5f,  0.5f, 0.f / 6, 0.0f,
     -0.5f,  0.5f, -0.5f, 0.f / 6, 1.0f,
      0.5f,  0.5f, -0.5f, 1.f / 6, 1.0f,
@@ -12,7 +14,7 @@ const std::array<float, 6 * 6 * 5> cube_vertices = {
      0.5f,  0.5f, -0.5f, 1.f / 6, 1.0f,
      0.5f,  0.5f,  0.5f, 1.f / 6, 0.0f,
 
-
+    // Bottom
     -0.5f, -0.5f,  0.5f, 1.f / 6, 0.0f,
     -0.5f, -0.5f, -0.5f, 1.f / 6, 1.0f,
      0.5f, -0.5f, -0.5f, 2.f / 6, 1.0f,
@@ -21,7 +23,7 @@ const std::array<float, 6 * 6 * 5> cube_vertices = {
      0.5f, -0.5f, -0.5f, 2.f / 6, 1.0f,
      0.5f, -0.5f,  0.5f, 2.f / 6, 0.0f,
 
-
+    // Front
     -0.5f, -0.5f,  0.5f, 2.f / 6, 0.0f,
     -0.5f,  0.5f,  0.5f, 2.f / 6, 1.0f,
      0.5f,  0.5f,  0.5f, 3.f / 6, 1.0f,
@@ -30,7 +32,7 @@ const std::array<float, 6 * 6 * 5> cube_vertices = {
      0.5f,  0.5f,  0.5f, 3.f / 6, 1.0f,
      0.5f, -0.5f,  0.5f, 3.f / 6, 0.0f,
 
-
+    // Back
     -0.5f, -0.5f, -0.5f, 3.f / 6, 0.0f,
     -0.5f,  0.5f, -0.5f, 3.f / 6, 1.0f,
      0.5f,  0.5f, -0.5f, 4.f / 6, 1.0f,
@@ -39,7 +41,7 @@ const std::array<float, 6 * 6 * 5> cube_vertices = {
      0.5f,  0.5f, -0.5f, 4.f / 6, 1.0f,
      0.5f, -0.5f, -0.5f, 4.f / 6, 0.0f,
 
-    
+    // Right
      0.5f, -0.5f,  0.5f, 4.f / 6, 0.0f,
      0.5f,  0.5f,  0.5f, 4.f / 6, 1.0f,
      0.5f,  0.5f, -0.5f, 5.f / 6, 1.0f,
@@ -48,7 +50,7 @@ const std::array<float, 6 * 6 * 5> cube_vertices = {
      0.5f,  0.5f, -0.5f, 5.f / 6, 1.0f,
      0.5f, -0.5f, -0.5f, 5.f / 6, 0.0f,
 
-
+    // Left
     -0.5f, -0.5f, -0.5f, 5.f / 6, 0.0f,
     -0.5f,  0.5f, -0.5f, 5.f / 6, 1.0f,
     -0.5f,  0.5f,  0.5f, 6.f / 6, 1.0f,

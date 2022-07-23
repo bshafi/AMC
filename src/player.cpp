@@ -13,9 +13,9 @@ Player::Player() {
 }
 
 
-void Player::set_position(const glm::vec3 &pos) {
+void Player::set_position(const glm::vec3 &pos, PhysicalWorld &phys) {
     this->position = pos;
-    camera.pos(pos + vec3(0, aabb.height, 0));
+    phys.main_camera.pos(pos + vec3(0, aabb.height, 0));
 }
 
 void Player::apply_gravity(PhysicalWorld &w, float delta_time_s) {
@@ -37,31 +37,31 @@ void Player::apply_gravity(PhysicalWorld &w, float delta_time_s) {
         auto velocity_copy = this->velocity;
 
         this->velocity = velocity_copy + glm::vec3(0, -gravity, 0) * delta_time_s;
-        set_position(w.try_move_to(position_copy, velocity_copy * delta_time_s, this->aabb));
+        set_position(w.try_move_to(position_copy, velocity_copy * delta_time_s, this->aabb), w);
     }
 
 }
 void Player::move_forward(float f, PhysicalWorld &w) {
     if (debug_mode) {
-        set_position(w.try_move_to(this->position, this->camera.forward() * movement_speed * f, this->aabb));
+        set_position(w.try_move_to(this->position, w.main_camera.forward() * movement_speed * f, this->aabb), w);
     } else {
-        glm::vec2 forward = { cos(camera.yaw()), sin(camera.yaw()) };
-        set_position(w.try_move_to(this->position, glm::vec3(forward.x, 0, forward.y) * movement_speed * f, this->aabb));
+        glm::vec2 forward = { cos(w.main_camera.yaw()), sin(w.main_camera.yaw()) };
+        set_position(w.try_move_to(this->position, glm::vec3(forward.x, 0, forward.y) * movement_speed * f, this->aabb), w);
     }
 }
 void Player::move_right(float f, PhysicalWorld &w) {
     if (debug_mode) {
-        set_position(w.try_move_to(this->position, this->camera.right() * movement_speed * f, this->aabb));
+        set_position(w.try_move_to(this->position, w.main_camera.right() * movement_speed * f, this->aabb), w);
     } else {
-        glm::vec2 right = { -sin(camera.yaw()), cos(camera.yaw()) };
-        set_position(w.try_move_to(this->position, glm::vec3(right.x, 0, right.y) * movement_speed * f, this->aabb));
+        glm::vec2 right = { -sin(w.main_camera.yaw()), cos(w.main_camera.yaw()) };
+        set_position(w.try_move_to(this->position, glm::vec3(right.x, 0, right.y) * movement_speed * f, this->aabb), w);
     }
 }
 void Player::look_up(float f, PhysicalWorld &w) {
-    this->camera.rotate_upwards(f);
+    w.main_camera.rotate_upwards(f);
 }
 void Player::look_right(float f, PhysicalWorld &w) {
-    this->camera.rotate_right(f);
+    w.main_camera.rotate_right(f);
 }
 void Player::jump(PhysicalWorld &w) {
     if (on_ground) {

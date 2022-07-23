@@ -19,7 +19,6 @@ SaveFile::SaveFile(const std::string &s) {
         std::ofstream temp(s);
     }
     file.open(s, std::ios_base::in | std::ios_base::out | std::ios_base::binary);
-
     file.exceptions(~std::ios_base::goodbit);
 
     if (file.seekg(0, std::ios_base::end).tellg() == 0) {
@@ -288,7 +287,7 @@ void PhysicalWorld::update_chunks() {
         }
     }
 
-    glm::ivec2 camera_chunk_pos = Chunk::world_pos_to_chunk_pos(player.camera.pos());
+    glm::ivec2 camera_chunk_pos = Chunk::world_pos_to_chunk_pos(main_camera.pos());
 
     bool made_request = false;
     for (int i = -5; i <= 5; ++i)
@@ -336,78 +335,28 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
             if (event.type == SDL_MOUSEBUTTONDOWN && SDL_GetRelativeMouseMode() == SDL_FALSE && event.button.button == SDL_BUTTON_LEFT) {
                 SDL_SetRelativeMouseMode(SDL_TRUE);
             }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_F3) {
-                player.toggle_debug_mode();
-            }
             if (event.type == SDL_MOUSEBUTTONDOWN && event.button.button == SDL_BUTTON_LEFT) {
 
             }
             if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_ESCAPE) {
                 SDL_SetRelativeMouseMode(SDL_FALSE);
             }
-            if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
-                //player.jump(*this);
-                space_pressed = true;
-            }
-            if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {
-                player.look_right(0.25f * M_PI * event.motion.xrel * delta_time_s, *this);
-                player.look_up(-0.25f * M_PI * event.motion.yrel * delta_time_s, *this);
-            }
         }
     }
 
-    
-    const auto keypresses = SDL_GetKeyboardState(NULL);
-    const float speed = 1000.f * delta_time_s;
-    vec3 movement = { 0, 0, 0 };
-    if (keypresses[SDL_SCANCODE_A]) {
-        movement = movement - player.camera.right();
-    }
-    if (keypresses[SDL_SCANCODE_D]) {
-        movement = movement + player.camera.right();
-    }
-    if (keypresses[SDL_SCANCODE_S]) {
-        movement = movement - player.camera.forward();
-    }
-    if (keypresses[SDL_SCANCODE_W]) {
-        movement = movement + player.camera.forward();
-    }
-    if (!player.debug_mode) {
-        movement = movement * vec3(1, 0, 1);
-    }
-    float mag = glm::length(movement);
-    if (mag >= 0.001f) {
-        movement = movement * speed;
-    }
-
-    std::vector<Entity> entities = {
-        {
-            {
-                player.position,
-                player.aabb
-            },
-            {
-                movement,
-                player.velocity,
-                !player.debug_mode,
-                player.on_ground
-            }
+    for (auto &entity : entities) {
+        if (entity.controller != nullptr) {
+            entity.controller->update(entity, *this, events, delta_time_s);
         }
-    };
-
-    if (space_pressed && entities[0].rigidbody.on_ground) {
-        entities[0].rigidbody.apply_impulse(vec3(0, Player::jump_speed, 0));
     }
 
     update_entities(*this, entities, delta_time_s);
 
-    player.set_position(entities[0].transform.pos);
-    player.velocity = entities[0].rigidbody.vel;
-    player.on_ground = entities[0].rigidbody.on_ground;
+    /*
 
     const uint32_t mouse_button_state = SDL_GetMouseState(nullptr, nullptr);
     if (mouse_button_state & SDL_BUTTON(SDL_BUTTON_LEFT) || mouse_button_state & SDL_BUTTON(SDL_BUTTON_RIGHT)) {
-        auto new_block = GetBlockFromRay(Ray{ player.camera.pos(), player.camera.forward() });
+        auto new_block = GetBlockFromRay(Ray{ main_camera.pos(), main_camera.forward() });
         if (selected_block != std::nullopt &&
             new_block->chunk_pos == selected_block->chunk_pos &&
             new_block->block_pos == selected_block->block_pos
@@ -418,19 +367,20 @@ void PhysicalWorld::handle_events(const std::vector<SDL_Event> &events, float de
                 
                 SetBlock(*selected_block, BlockType::Air);
             
-                /* TODO: FIXME When blocks change request a change in the renderer somehow
+                TODO: FIXME When blocks change request a change in the renderer somehow
                 auto loc = meshes.find(new_block->chunk_pos);
                 if (loc != meshes.end()) {
                     loc->second = MeshBuffer(BlockMesh::Generate(chunks[new_block->chunk_pos]));
                 }
                 
-                */
+            
             }
         } else {
             this->selected_block = new_block;
             selected_block_damage = BLOCK_DURABILITY;
         }
     }
+    */
 }
 
 
@@ -541,6 +491,11 @@ PhysicalWorld::PhysicalWorld()
     : loader("saves/save0.hex") {
     selected_block_damage = BLOCK_DURABILITY;
 
+    {
+        Entity main_player = *Entity::create("player");
+        main_player.controller->init(main_player, *this);
+        entities.emplace_back(std::move(main_player));
+    }
 }
 PhysicalWorld::~PhysicalWorld() {
 }
@@ -648,12 +603,9 @@ void RenderWorld::draw(PhysicalWorld &phys) {
 
     ASSERT_ON_GL_ERROR();
      
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glm::mat4 view = phys.player.camera.view_matrix();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-    
+    update_ubo_matrices(globals_3d_ubo, phys.main_camera.view_matrix());
     ASSERT_ON_GL_ERROR();
+
 
     shader.bind_texture_to_sampler_2D({
         { "orientation", orientation_texture },
@@ -668,8 +620,10 @@ void RenderWorld::draw(PhysicalWorld &phys) {
 
     float RENDER_DISTANCE = PhysicalWorld::RENDER_DISTANCE * Chunk::CHUNK_WIDTH;
 
+
+    
     for (auto &[chunk_pos, mesh_buffer] : this->meshes) {
-        if (glm::length(glm::vec2(phys.player.position.x, phys.player.position.z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
+        if (glm::length(glm::vec2(phys.main_camera.pos().x, phys.main_camera.pos().z) - glm::vec2(chunk_pos.x * Chunk::CHUNK_WIDTH, chunk_pos.y * Chunk::CHUNK_WIDTH)) >= RENDER_DISTANCE) {
             continue;
         }
         shader.retrieve_shader_variable<glm::ivec2>("chunk_pos").set(chunk_pos);
@@ -688,6 +642,14 @@ void RenderWorld::draw(PhysicalWorld &phys) {
     phys.inventory.draw(frect{ 0, 0, static_cast<float>(GetTrueWindowSize().x), static_cast<float>(GetTrueWindowSize().y) }, 0);
 
     ASSERT_ON_GL_ERROR();
+    
+    //model_renderer.camera = phys.main_camera;
+    for (const auto &entity : phys.entities) {
+        if (entity.type == EntityType::Player) {
+            model_renderer.draw(zombie_model.models, &zombie_texture, phys.main_camera.pos() - glm::vec3(0, 1.f, 0));
+        }
+    }
+    
 
 #ifdef ENABLE_IMGUI
     ImGui::Begin("World");
@@ -697,7 +659,7 @@ void RenderWorld::draw(PhysicalWorld &phys) {
         //phys.generate();
     }
     if (ImGui::Button("toggle debug mode")) {
-        phys.player.debug_mode = !phys.player.debug_mode;
+        //phys.player.debug_mode = !phys.player.debug_mode;
     }
     ImGui::DragFloat("gravity", &Player::gravity, 0.0f, 10.0f);
     ImGui::DragFloat("movement_speed", &Player::movement_speed, 0.0f, 10.0f);
@@ -718,11 +680,12 @@ void RenderWorld::draw(PhysicalWorld &phys) {
 #endif
 }
 
-RenderWorld::RenderWorld(PhysicalWorld &phys) : 
+RenderWorld::RenderWorld(PhysicalWorld &phys) :
+    zombie_model("resources/zombie.mcmodel"),
+    zombie_texture("resources/zombie.png"),
     orientation_texture("resources/hello_cube_orientation.png"),
     blocks_texture("resources/blocks.png"),
     shader("shaders/block.vert", "shaders/chunk.frag") {
-
 
     ASSERT_ON_GL_ERROR();
 
@@ -734,20 +697,7 @@ RenderWorld::RenderWorld(PhysicalWorld &phys) :
 
     ASSERT_ON_GL_ERROR();
 
-    glGenBuffers(1, &globals_3d_ubo);
-    glBindBuffer(GL_UNIFORM_BUFFER, globals_3d_ubo);
-    glBufferData(GL_UNIFORM_BUFFER, sizeof(glm::mat4) * 2, nullptr, GL_STATIC_DRAW);
-    glm::mat4 view = phys.player.camera.view_matrix();
-    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(glm::mat4), glm::value_ptr(view));
-    glm::mat4 projection = glm::perspective(static_cast<float>(M_PI / 4), 640.f / 480.f, 0.1f, 100.f);
-    glBufferSubData(GL_UNIFORM_BUFFER, sizeof(glm::mat4), sizeof(glm::mat4), glm::value_ptr(projection));
-
-    this->shader.bind_UBO("globals_3d", 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
-
-    this->shader.bind_UBO("globals_3d", 0);
-    glBindBufferBase(GL_UNIFORM_BUFFER, 0, globals_3d_ubo);
-
+    globals_3d_ubo = generate_ubo(shader, phys.main_camera.view_matrix());
     ASSERT_ON_GL_ERROR();
 }
 RenderWorld::~RenderWorld() {

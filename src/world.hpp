@@ -13,6 +13,7 @@
 #include "player.hpp"
 #include "inventory.hpp"
 #include "mesh.hpp"
+#include "entity.hpp"
 
 class Renderer;
 
@@ -82,11 +83,14 @@ struct PhysicalWorld {
     std::unordered_map<glm::ivec2, ChunkPtr> chunks;
     Player player;
     std::optional<BlockHit> selected_block;
+    std::vector<Entity> entities;
     int32_t selected_block_damage;
     static constexpr uint32_t BLOCK_DURABILITY = 100;
     static constexpr uint32_t RENDER_DISTANCE = 4;
 
     Inventory inventory;
+
+    Camera main_camera;
 
     float frequency = 1.f;
     int32_t octaves = 4;
@@ -117,6 +121,9 @@ struct PhysicalWorld {
 };
 
 struct RenderWorld {
+    EditableMCModel zombie_model;
+    Texture zombie_texture;
+    ModelRenderer model_renderer;
     std::unordered_map<glm::ivec2, MeshBuffer> meshes;
     std::vector<MeshBuffer> empty_meshes;
     Texture orientation_texture;

@@ -23,13 +23,18 @@ list(APPEND CPP_FILES
   src/gui.cpp src/gui_element_visitor.cpp src/tool.cpp src/imgui.cpp src/imgui_widgets.cpp 
   src/imgui_draw.cpp src/imgui_demo.cpp src/imgui_tables.cpp src/imgui_impl_sdl.cpp
   src/imgui_impl_opengl3.cpp src/mesh.cpp
-  src/physics.cpp src/entity.cpp
+  src/physics.cpp src/entity.cpp src/model.cpp
+  src/imgui_stdlib.cpp
 )
 
 
 add_executable(game src/main.cpp ${CPP_FILES})
 target_link_libraries(game SDL2 libglew_static SDL2_image glm::glm gtest)
 target_include_directories(game PRIVATE ${OPENGL_INCLUDE_DIRS})
+
+add_executable(animation_editor src/animation_editor.cpp ${CPP_FILES})
+target_link_libraries(animation_editor SDL2 libglew_static SDL2_image glm::glm gtest)
+target_include_directories(animation_editor PRIVATE ${OPENGL_INCLUDE_DIRS})
 
 add_executable(test tests/test.cpp ${CPP_FILES})
 target_link_libraries(test SDL2 libglew_static SDL2_image glm::glm gtest)

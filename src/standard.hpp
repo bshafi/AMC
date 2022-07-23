@@ -29,7 +29,7 @@ template <uint32_t Width, uint32_t Height, uint32_t Length, typename T>
 using Array3d = std::array<std::array<std::array<T, Length>, Height>, Width>;
 
 using vec3 = glm::vec3;
-using vec2 = glm::vec3;
+using vec2 = glm::vec2;
 
 
 // This forces the static_assert to evaluate on the type argument rather than evaluating
