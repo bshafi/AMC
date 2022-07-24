@@ -117,6 +117,7 @@ std::ostream& write_binary<std::string>(std::ostream &os, const std::string &s) 
     for (uint32_t i = 0; i < s.size(); ++i) {
         write_binary<uint8_t>(os, static_cast<uint8_t>(s[i]));
     }
+    return os;
 }
 
 template <>
@@ -131,6 +132,7 @@ template <>
 std::ostream& write_binary(std::ostream &os, const vec2 &v) {
     write_binary<float>(os, v.x);
     write_binary<float>(os, v.y);
+    return os;
 }
 
 
@@ -148,6 +150,8 @@ std::ostream& write_binary(std::ostream &os, const vec3 &v) {
     write_binary<float>(os, v.x);
     write_binary<float>(os, v.y);
     write_binary<float>(os, v.z);
+
+    return os;
 }
 
 
@@ -165,6 +169,8 @@ std::ostream& write_binary(std::ostream &os, const glm::quat &v) {
     write_binary<float>(os, v.y);
     write_binary<float>(os, v.z);
     write_binary<float>(os, v.w);
+
+    return os;
 }
 
 float roundup(float x) {
