@@ -135,7 +135,7 @@ void PlayerController::update(Entity &entity, PhysicalWorld &world, const std::v
             default:;
             }
         }
-        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE) {
+        if (event.type == SDL_KEYDOWN && event.key.keysym.scancode == SDL_SCANCODE_SPACE && !debug_mode) {
             entity.rigidbody.apply_impulse(vec3(0.f, 4.5f, 0.f));
         }
         if (event.type == SDL_MOUSEMOTION && SDL_GetRelativeMouseMode() == SDL_TRUE) {

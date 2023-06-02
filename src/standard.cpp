@@ -193,8 +193,8 @@ AABB::AABB(float w, float h, float l) {
 
 bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1) {
     return ranges_overlap(pos0.x,  aabb0.width, pos1.x, aabb1.width) &&
-           ranges_overlap(pos0.y, aabb0.height, pos1.y, aabb1.height) &&
-           ranges_overlap(pos0.z, aabb0.length, pos1.z, aabb1.length);
+        ranges_overlap(pos0.y, aabb0.height, pos1.y, aabb1.height) &&
+        ranges_overlap(pos0.z, aabb0.length, pos1.z, aabb1.length);
 }
 
 bool BoundingBox::contains(const glm::vec3 &point) const {

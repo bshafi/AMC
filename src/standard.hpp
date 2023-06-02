@@ -130,10 +130,14 @@ struct BoundingBox {
 bool AABBIntersection(glm::vec3 pos0, AABB aabb0, glm::vec3 pos1, AABB aabb1);
 
 template <typename A, typename B>
+bool intersects(const A &a, const B &b);
+
+/* For some reason, in some compilers the following code creates an illegal hardware instruction
+template <typename A, typename B>
 bool intersects(const A &a, const B &b) {
     return intersects<B, A>(b, a);
 }
-
+*/
 
 struct Handle {
 public:
